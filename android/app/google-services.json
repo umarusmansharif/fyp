@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "202908665820",
+    "project_id": "renthouse-d5d9e",
+    "storage_bucket": "renthouse-d5d9e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:202908665820:android:285aee51eceb6193663119",
+        "android_client_info": {
+          "package_name": "com.example.renthouse"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCpzrgHCK-S2dCnI8ovRbElLpDEgNI8cTs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
