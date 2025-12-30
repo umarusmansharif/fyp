@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/screens/auth/signup_screen.dart';
 import 'package:renthouse/screens/dashboard_screen.dart';
 import 'package:renthouse/services/auth_service.dart';
@@ -61,27 +62,42 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 50),
+                  // Logo/Image
+                  Container(
+                    alignment: Alignment.center,
+                    child: Image.asset(
+                      AppConstants.splashImage,
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                Text(
                   'Welcome Back',
-                  style: TextStyle(
-                    fontSize: 32,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineMedium!.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 10),
-                const Text(
+                const SizedBox(height: 8),
+                Text(
                   'Sign in to continue',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                    color: Colors.grey[600],
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -123,11 +139,47 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: _login,
                   isLoading: _isLoading,
                 ),
+                const SizedBox(height: 24),
+                Text(
+                  'Or continue with',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  onPressed: () {
+                    // TODO: Implement social login
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.grey),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Image.asset(
+                        AppConstants.splashImage,
+                        width: 24,
+                        height: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Continue with Google'),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Don't have an account? "),
+                    Text(
+                      "Don't have an account? ",
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -137,21 +189,24 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         );
                       },
-                      child: const Text(
+                      child: Text(
                         'Sign Up',
-                        style: TextStyle(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium!
+                            .copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 20),
               ],
             ),
           ),
         ),
       ),
-    );
+      )  );
   }
-}
+  }

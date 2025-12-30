@@ -8,7 +8,6 @@ import 'package:renthouse/screens/house_detail_screen.dart';
 import 'package:renthouse/screens/profile_screen.dart';
 import 'package:renthouse/services/auth_service.dart';
 import 'package:renthouse/services/database_service.dart';
-import 'package:renthouse/widgets/custom_app_bar.dart';
 import 'package:renthouse/widgets/house_card.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -22,6 +21,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   UserModel? _currentUser;
+  int _currentIndex = 0;
+  int _selectedCategory = 0;
 
   @override
   void initState() {
@@ -51,133 +52,386 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Dashboard',
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        leading: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProfileScreen(user: _currentUser),
+              ),
+            );
+          },
+          child: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: CircleAvatar(
+              radius: 20,
+              backgroundImage: _currentUser?.profileImage != null && _currentUser!.profileImage!.isNotEmpty
+                  ? NetworkImage(_currentUser!.profileImage!)
+                  : const AssetImage(AppConstants.defaultProfileImage) as ImageProvider,
+              backgroundColor: Colors.grey[200],
+              child: _currentUser?.profileImage == null || _currentUser!.profileImage!.isEmpty
+                  ? Icon(Icons.person, color: Colors.grey[500])
+                  : null,
+            ),
+          ),
+        ),
+        title: const Text(
+          'RentHouse',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+        centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProfileScreen(user: _currentUser),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: Colors.black),
             onPressed: _signOut,
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Header with welcome message
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Welcome,',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      Text(
-                        _currentUser?.name ?? 'User',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+      body: SingleChildScrollView(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 30),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFF9FAFB),
+                Color(0xFFEFF3F6),
+              ],
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 20),
+              // Welcome text
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Welcome, ${_currentUser?.name ?? 'User'}',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
                   ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Find your home here',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Search bar
+              Container(
+                height: 50,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
                 ),
-                if (_currentUser?.userType == AppConstants.userTypeLandlord)
-                  ElevatedButton.icon(
+                child: Row(
+                  children: [
+                    const Icon(Icons.search, color: Colors.grey),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(
+                          hintText: 'Search houses...',
+                          border: InputBorder.none,
+                          hintStyle: TextStyle(color: Colors.grey),
+                        ),
+                        style: const TextStyle(color: Colors.black),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Category tabs
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _buildCategoryTab('Top Recommended', 0),
+                    const SizedBox(width: 12),
+                    _buildCategoryTab('Near You', 1),
+                    const SizedBox(width: 12),
+                    _buildCategoryTab('Your Favorite', 2),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Horizontal house gallery
+              const Text(
+                'Recommended For You',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 220,
+                child: StreamBuilder<List<HouseModel>>(
+                  stream: _databaseService.getHouses(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Error: ${snapshot.error}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      );
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No houses available',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      );
+                    }
+
+                    final houses = snapshot.data!;
+
+                    // Show first few houses in the main gallery
+                    final mainHouses = houses.take(5).toList();
+
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: mainHouses.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: EdgeInsets.only(right: index == mainHouses.length - 1 ? 0 : 12),
+                          child: SizedBox(
+                            width: 280,
+                            child: HouseCard(
+                              house: mainHouses[index],
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => HouseDetailScreen(
+                                      house: mainHouses[index],
+                                      currentUser: _currentUser,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Best Offer section
+              const Text(
+                'Best Offer',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 220,
+                child: StreamBuilder<List<HouseModel>>(
+                  stream: _databaseService.getHouses(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Error: ${snapshot.error}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      );
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No houses available',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      );
+                    }
+
+                    final houses = snapshot.data!;
+
+                    // Show remaining houses in Best Offer section
+                    final bestOfferHouses = houses.length > 5 ? houses.skip(5).toList() : houses;
+
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: bestOfferHouses.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: EdgeInsets.only(right: index == bestOfferHouses.length - 1 ? 0 : 12),
+                          child: SizedBox(
+                            width: 280,
+                            child: HouseCard(
+                              house: bestOfferHouses[index],
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => HouseDetailScreen(
+                                      house: bestOfferHouses[index],
+                                      currentUser: _currentUser,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Add House button for landlords
+              if (_currentUser?.userType == AppConstants.userTypeLandlord)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: ElevatedButton(
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const AddHouseScreen(),
-                        ),
+                        MaterialPageRoute(builder: (_) => AddHouseScreen()),
                       );
                     },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add House'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).primaryColor,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            // Houses list
-            Expanded(
-              child: StreamBuilder<List<HouseModel>>(
-                stream: _databaseService.getHouses(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'No houses available',
-                        style: TextStyle(fontSize: 18),
+                    child: const Text(
+                      'Add House',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  }
-
-                  final houses = snapshot.data!;
-
-                  return GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.8,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
                     ),
-                    itemCount: houses.length,
-                    itemBuilder: (context, index) {
-                      return HouseCard(
-                        house: houses[index],
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => HouseDetailScreen(
-                                house: houses[index],
-                                currentUser: _currentUser,
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildCategoryTab(String title, int index) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedCategory = index;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: _selectedCategory == index ? Theme.of(context).colorScheme.primary : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: _selectedCategory == index ? Theme.of(context).colorScheme.primary : Colors.grey[300]!,
+          ),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: _selectedCategory == index ? Colors.white : Colors.grey[700],
+            fontWeight: _selectedCategory == index ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return BottomNavigationBar(
+      type: BottomNavigationBarType.fixed,
+      currentIndex: _currentIndex,
+      onTap: (index) {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.search),
+          label: 'Search',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.notifications),
+          label: 'Notifications',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.chat),
+          label: 'Chat',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.favorite),
+          label: 'Favorite',
+        ),
+      ],
     );
   }
 }

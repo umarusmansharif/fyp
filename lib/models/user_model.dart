@@ -6,6 +6,7 @@ class UserModel {
   final String email;
   final String phone;
   final String userType;
+  final String? profileImage;
   final DateTime createdAt;
 
   UserModel({
@@ -14,6 +15,7 @@ class UserModel {
     required this.email,
     required this.phone,
     required this.userType,
+    this.profileImage,
     required this.createdAt,
   });
 
@@ -24,6 +26,7 @@ class UserModel {
       'email': email,
       'phone': phone,
       'userType': userType,
+      'profileImage': profileImage,
       'createdAt': createdAt,
     };
   }
@@ -35,6 +38,7 @@ class UserModel {
       email: map['email'] ?? '',
       phone: map['phone'] ?? '',
       userType: map['userType'] ?? '',
+      profileImage: map['profileImage'],
       createdAt: (map['createdAt'] as Timestamp).toDate(),
     );
   }

@@ -113,11 +113,30 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // House image
-            Image.asset(
-              AppConstants.houseImage,
+            Container(
               width: double.infinity,
               height: 250,
-              fit: BoxFit.cover,
+              child: widget.house.imageUrl.isNotEmpty
+                ? Image.network(
+                    widget.house.imageUrl,
+                    width: double.infinity,
+                    height: 250,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Image.asset(
+                        AppConstants.defaultHouseImage,
+                        width: double.infinity,
+                        height: 250,
+                        fit: BoxFit.cover,
+                      );
+                    },
+                  )
+                : Image.asset(
+                    AppConstants.defaultHouseImage,
+                    width: double.infinity,
+                    height: 250,
+                    fit: BoxFit.cover,
+                  ),
             ),
             Padding(
               padding: const EdgeInsets.all(16),
@@ -182,7 +201,7 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Additional details
+                  // Additional details with icons
                   const Text(
                     'Details',
                     style: TextStyle(
@@ -191,8 +210,9 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  _buildDetailRow('Area', '${widget.house.area} Marla'),
-                  _buildDetailRow('Type', widget.house.houseType),
+                  _buildIconDetailRow(Icons.square_foot, 'Area', '${widget.house.area} Marla'),
+                  _buildIconDetailRow(Icons.home, 'Type', widget.house.houseType),
+                  _buildIconDetailRow(Icons.location_on, 'Location', widget.house.location),
                   const SizedBox(height: 20),
                   // Landlord info
                   const Text(
@@ -219,24 +239,20 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
                     },
                   ),
                   const SizedBox(height: 30),
-                  // Action buttons
+                  // Action buttons - full width, separate lines
                   if (widget.currentUser?.userType == AppConstants.userTypeTenant)
-                    Row(
+                    Column(
                       children: [
-                        Expanded(
-                          child: CustomButton(
-                            text: 'Request House',
-                            onPressed: _requestHouse,
-                            color: Theme.of(context).primaryColor,
-                          ),
+                        CustomButton(
+                          text: 'Request House',
+                          onPressed: _requestHouse,
+                          color: Theme.of(context).primaryColor,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: CustomButton(
-                            text: 'WhatsApp',
-                            onPressed: _contactViaWhatsApp,
-                            color: Colors.green,
-                          ),
+                        const SizedBox(height: 10),
+                        CustomButton(
+                          text: 'WhatsApp',
+                          onPressed: _contactViaWhatsApp,
+                          color: Colors.green,
                         ),
                       ],
                     ),
@@ -273,6 +289,53 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildIconDetailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: Theme.of(context).primaryColor,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 3,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

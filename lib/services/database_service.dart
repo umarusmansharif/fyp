@@ -4,6 +4,7 @@ import 'package:renthouse/models/order_model.dart';
 import 'package:renthouse/models/user_model.dart';
 import 'package:renthouse/models/notification_model.dart';
 import 'package:renthouse/core/constants.dart';
+import 'package:renthouse/services/cloudinary_service.dart';
 
 class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -150,6 +151,65 @@ class DatabaseService {
           .collection(AppConstants.notificationsCollection)
           .doc(notificationId)
           .update({'isRead': true});
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Update house
+  Future<void> updateHouse(HouseModel house) async {
+    try {
+      await _firestore
+          .collection(AppConstants.housesCollection)
+          .doc(house.houseId)
+          .update({
+            'title': house.title,
+            'price': house.price,
+            'description': house.description,
+            'location': house.location,
+            'area': house.area,
+            'houseType': house.houseType,
+            'imageUrl': house.imageUrl,
+            // Note: We don't update landlordId, houseId, or createdAt as these shouldn't change
+          });
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Delete house
+  Future<void> deleteHouse(String houseId) async {
+    try {
+      // First get the house to retrieve the image URL
+      final house = await getHouseById(houseId);
+      if (house != null && house.imageUrl.isNotEmpty) {
+        // Check if it's a Cloudinary URL (not the default asset image)
+        if (house.imageUrl.contains('cloudinary.com')) {
+          // Attempt to delete the image from Cloudinary
+          bool imageDeleted = await CloudinaryService.deleteImageFromCloudinary(house.imageUrl);
+          if (!imageDeleted) {
+            print('Warning: Could not delete image from Cloudinary: ${house.imageUrl}');
+          }
+        }
+      }
+      
+      // Delete the house document from Firestore
+      await _firestore
+          .collection(AppConstants.housesCollection)
+          .doc(houseId)
+          .delete();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Update user profile image
+  Future<void> updateUserProfileImage(String userId, String profileImageUrl) async {
+    try {
+      await _firestore
+          .collection(AppConstants.usersCollection)
+          .doc(userId)
+          .update({'profileImage': profileImageUrl});
     } catch (e) {
       rethrow;
     }

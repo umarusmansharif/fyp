@@ -51,6 +51,12 @@ dependencies:
   
   # UUID for generating unique IDs
   uuid: ^4.5.1
+  
+  # Image picker for selecting images
+  image_picker: ^1.1.2
+  
+  # HTTP for API calls
+  http: ^1.2.2
 
 dev_dependencies:
   flutter_test:
@@ -91,7 +97,6 @@ flutter:
   # example:
   # fonts:
   #   - family: Schyler
-  #     fonts:
   #       - asset: fonts/Schyler-Regular.ttf
   #       - asset: fonts/Schyler-Italic.ttf
   #         style: italic

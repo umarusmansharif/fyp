@@ -17,20 +17,24 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       leading: onBackPress != null
           ? IconButton(
-              icon: const Icon(Icons.arrow_back),
+              icon: Icon(
+                Icons.arrow_back,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               onPressed: onBackPress,
             )
           : null,
       title: Text(
         title,
-        style: const TextStyle(
-          fontSize: 20,
+        style: Theme.of(context).textTheme.titleLarge!.copyWith(
           fontWeight: FontWeight.bold,
         ),
       ),
       centerTitle: true,
       actions: actions,
       elevation: 0,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
     );
   }
 

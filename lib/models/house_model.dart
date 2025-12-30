@@ -9,6 +9,7 @@ class HouseModel {
   final String location;
   final double area; // in marla
   final String houseType;
+  final String imageUrl;
   final DateTime createdAt;
 
   HouseModel({
@@ -20,6 +21,7 @@ class HouseModel {
     required this.location,
     required this.area,
     required this.houseType,
+    required this.imageUrl,
     required this.createdAt,
   });
 
@@ -33,21 +35,23 @@ class HouseModel {
       'location': location,
       'area': area,
       'houseType': houseType,
-      'createdAt': createdAt,
+      'imageUrl': imageUrl,
+      'createdAt': Timestamp.fromDate(createdAt),
     };
   }
 
   factory HouseModel.fromMap(Map<String, dynamic> map) {
     return HouseModel(
-      houseId: map['houseId'] ?? '',
-      landlordId: map['landlordId'] ?? '',
-      title: map['title'] ?? '',
-      price: (map['price'] ?? 0).toDouble(),
-      description: map['description'] ?? '',
-      location: map['location'] ?? '',
-      area: (map['area'] ?? 0).toDouble(),
-      houseType: map['houseType'] ?? '',
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      houseId: map['houseId']?.toString() ?? '',
+      landlordId: map['landlordId']?.toString() ?? '',
+      title: map['title']?.toString() ?? '',
+      price: (map['price'] != null) ? (map['price'] as num).toDouble() : 0.0,
+      description: map['description']?.toString() ?? '',
+      location: map['location']?.toString() ?? '',
+      area: (map['area'] != null) ? (map['area'] as num).toDouble() : 0.0,
+      houseType: map['houseType']?.toString() ?? '',
+      imageUrl: map['imageUrl']?.toString() ?? '',
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 }

@@ -11,14 +11,16 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:renthouse/services/cloudinary_service.dart';
 
-class AddHouseScreen extends StatefulWidget {
-  const AddHouseScreen({Key? key}) : super(key: key);
+class EditHouseScreen extends StatefulWidget {
+  final HouseModel house;
+  
+  const EditHouseScreen({Key? key, required this.house}) : super(key: key);
 
   @override
-  State<AddHouseScreen> createState() => _AddHouseScreenState();
+  State<EditHouseScreen> createState() => _EditHouseScreenState();
 }
 
-class _AddHouseScreenState extends State<AddHouseScreen> {
+class _EditHouseScreenState extends State<EditHouseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _priceController = TextEditingController();
@@ -31,6 +33,19 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
   bool _isLoading = false;
   XFile? _selectedImage;
   String? _imagePreviewUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize controllers with existing house data
+    _titleController.text = widget.house.title;
+    _priceController.text = widget.house.price.toString();
+    _descriptionController.text = widget.house.description;
+    _locationController.text = widget.house.location;
+    _areaController.text = widget.house.area.toString();
+    _houseTypeController.text = widget.house.houseType;
+    _imagePreviewUrl = widget.house.imageUrl;
+  }
 
   Future<void> _pickImage() async {
     final XFile? pickedFile = await ImagePicker().pickImage(
@@ -55,7 +70,7 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
     super.dispose();
   }
 
-  Future<void> _addHouse() async {
+  Future<void> _updateHouse() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -67,9 +82,9 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
           throw 'User not authenticated';
         }
 
-        String imageUrl = '';
+        String imageUrl = widget.house.imageUrl; // Keep existing image URL by default
         
-        // Upload image to Cloudinary if selected
+        // Upload new image to Cloudinary if selected
         if (_selectedImage != null) {
           final imageFile = File(_selectedImage!.path);
           print('Attempting to upload image: ${imageFile.path}');
@@ -92,39 +107,29 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
             if (!mounted) return;
             throw Exception('Image upload failed: $e');
           }
-        } else {
-          throw 'Please select an image for the house';
         }
 
-        final house = HouseModel(
-          houseId: const Uuid().v4(),
-          landlordId: user.uid,
+        final updatedHouse = HouseModel(
+          houseId: widget.house.houseId,
+          landlordId: widget.house.landlordId,
           title: _titleController.text.trim(),
-          price: double.tryParse(_priceController.text.trim()) ?? 0.0,
+          price: double.tryParse(_priceController.text.trim()) ?? widget.house.price,
           description: _descriptionController.text.trim(),
           location: _locationController.text.trim(),
-          area: double.tryParse(_areaController.text.trim()) ?? 0.0,
+          area: double.tryParse(_areaController.text.trim()) ?? widget.house.area,
           houseType: _houseTypeController.text.trim(),
           imageUrl: imageUrl,
-          createdAt: DateTime.now(),
+          createdAt: widget.house.createdAt,
         );
 
-        await _databaseService.addHouse(house);
+        await _databaseService.updateHouse(updatedHouse);
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('House added successfully!')),
+          const SnackBar(content: Text('House updated successfully!')),
         );
 
-        // Clear form
-        _titleController.clear();
-        _priceController.clear();
-        _descriptionController.clear();
-        _locationController.clear();
-        _areaController.clear();
-        _houseTypeController.clear();
-        _selectedImage = null;
-        _imagePreviewUrl = null;
+        Navigator.pop(context); // Go back to previous screen
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -142,7 +147,7 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CustomAppBar(
-        title: 'Add New House',
+        title: 'Edit House',
         onBackPress: () {
           Navigator.pop(context);
         },
@@ -285,7 +290,7 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
-                                    'Image selected',
+                                    'New image selected',
                                     style: TextStyle(
                                       color: Colors.green[600],
                                       fontWeight: FontWeight.w500,
@@ -293,33 +298,67 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
                                   ),
                                 ],
                               )
-                            : Container(
-                                padding: const EdgeInsets.all(20),
-                                alignment: Alignment.center,
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      Icons.add_photo_alternate,
-                                      size: 60,
-                                      color: Colors.grey[400],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    const Text(
-                                      'Tap to select an image',
-                                      style: TextStyle(
-                                        color: Colors.grey,
+                            : _imagePreviewUrl != null && _imagePreviewUrl!.isNotEmpty
+                                ? Column(
+                                    children: [
+                                      Container(
+                                        height: 150,
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(8),
+                                          color: Colors.grey[100],
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.network(
+                                            _imagePreviewUrl!,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Image.asset(
+                                                AppConstants.defaultHouseImage,
+                                                fit: BoxFit.cover,
+                                              );
+                                            },
+                                          ),
+                                        ),
                                       ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        'Current image',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Container(
+                                    padding: const EdgeInsets.all(20),
+                                    alignment: Alignment.center,
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          Icons.add_photo_alternate,
+                                          size: 60,
+                                          color: Colors.grey[400],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        const Text(
+                                          'No image available',
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
+                                  ),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         child: ElevatedButton.icon(
                           onPressed: _pickImage,
                           icon: const Icon(Icons.add_a_photo),
-                          label: Text(_selectedImage != null ? 'Change Image' : 'Select Image'),
+                          label: Text(_selectedImage != null ? 'Change Image' : 'Select New Image'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(context).colorScheme.primary,
                             foregroundColor: Colors.white,
@@ -331,8 +370,8 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
                 ),
                 const SizedBox(height: 30),
                 CustomButton(
-                  text: 'Add House',
-                  onPressed: _addHouse,
+                  text: 'Update House',
+                  onPressed: _updateHouse,
                   isLoading: _isLoading,
                 ),
               ],
