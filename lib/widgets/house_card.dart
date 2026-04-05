@@ -22,7 +22,7 @@ class HouseCard extends StatelessWidget {
               : index < rating
               ? Icons.star_half
               : Icons.star_border,
-          size: 14,
+          size: 13,
           color: Colors.amber,
         );
       }),
@@ -42,11 +42,10 @@ class HouseCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // IMAGE SECTION (fixed ratio)
+            /// IMAGE (height SAME – no change)
             AspectRatio(
-              aspectRatio: 4 / 3,
+              aspectRatio: 16 / 9,
               child: house.imageUrl.isNotEmpty
                   ? Image.network(
                 house.imageUrl,
@@ -64,14 +63,14 @@ class HouseCard extends StatelessWidget {
               ),
             ),
 
-            // CONTENT SECTION (height controlled)
+            /// CONTENT (overflow fixed)
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    /// TITLE + PRICE
                     Row(
                       children: [
                         Expanded(
@@ -95,17 +94,28 @@ class HouseCard extends StatelessWidget {
                       ],
                     ),
 
+                    const SizedBox(height: 4),
+
+                    /// RATING
                     _buildRating(4.5),
 
-                    Text(
-                      house.description,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[700],
+                    const SizedBox(height: 4),
+
+                    /// DESCRIPTION
+                    Expanded(
+                      child: Text(
+                        house.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[700],
+                        ),
                       ),
                     ),
 
+                    const SizedBox(height: 4),
+
+                    /// LOCATION
                     Row(
                       children: [
                         Icon(

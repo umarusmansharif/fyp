@@ -244,15 +244,17 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
                     Column(
                       children: [
                         CustomButton(
-                          text: 'Request House',
-                          onPressed: _requestHouse,
-                          color: Theme.of(context).primaryColor,
-                        ),
-                        const SizedBox(height: 10),
-                        CustomButton(
                           text: 'WhatsApp',
                           onPressed: _contactViaWhatsApp,
                           color: Colors.green,
+                          width: double.infinity,
+                        ),
+                        const SizedBox(height: 10),
+                        CustomButton(
+                          text: 'Request House',
+                          onPressed: _requestHouse,
+                          color: Theme.of(context).primaryColor,
+                          width: double.infinity,
                         ),
                       ],
                     ),
