@@ -3,9 +3,13 @@ import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/models/house_model.dart';
 import 'package:renthouse/models/user_model.dart';
 import 'package:renthouse/screens/add_house_screen.dart';
+import 'package:renthouse/screens/ai_chatbot_screen.dart';
 import 'package:renthouse/screens/auth/login_screen.dart';
+import 'package:renthouse/screens/chat_list_screen.dart';
+import 'package:renthouse/screens/favorites_screen.dart';
 import 'package:renthouse/screens/house_detail_screen.dart';
 import 'package:renthouse/screens/profile_screen.dart';
+import 'package:renthouse/screens/search_screen.dart';
 import 'package:renthouse/services/auth_service.dart';
 import 'package:renthouse/services/database_service.dart';
 import 'package:renthouse/widgets/house_card.dart';
@@ -140,29 +144,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 20),
               // Search bar
-              Container(
-                height: 50,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, color: Colors.grey),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          hintText: 'Search houses...',
-                          border: InputBorder.none,
-                          hintStyle: TextStyle(color: Colors.grey),
-                        ),
-                        style: const TextStyle(color: Colors.black),
-                      ),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SearchScreen(currentUser: _currentUser),
                     ),
-                  ],
+                  );
+                },
+                child: Container(
+                  height: 50,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search, color: Colors.grey),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Search houses...',
+                        style: TextStyle(color: Colors.grey[500]),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -371,6 +379,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AIChatbotScreen()),
+          );
+        },
+        backgroundColor: Theme.of(context).primaryColor,
+        icon: const Icon(Icons.smart_toy, color: Colors.white),
+        label: const Text(
+          'AI Assistant',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -409,6 +432,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() {
           _currentIndex = index;
         });
+        
+        // Navigate to different screens based on tab
+        switch (index) {
+          case 0: // Home - stay on dashboard
+            break;
+          case 1: // Search
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SearchScreen(currentUser: _currentUser),
+              ),
+            ).then((_) {
+              setState(() {
+                _currentIndex = 0;
+              });
+            });
+            break;
+          case 2: // Notifications
+            // TODO: Navigate to notifications screen when created
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Notifications coming soon!')),
+            );
+            setState(() {
+              _currentIndex = 0;
+            });
+            break;
+          case 3: // Chat
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatListScreen(currentUser: _currentUser),
+              ),
+            ).then((_) {
+              setState(() {
+                _currentIndex = 0;
+              });
+            });
+            break;
+          case 4: // Favorites
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => FavoritesScreen(currentUser: _currentUser),
+              ),
+            ).then((_) {
+              setState(() {
+                _currentIndex = 0;
+              });
+            });
+            break;
+        }
       },
       items: const [
         BottomNavigationBarItem(

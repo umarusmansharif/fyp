@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:renthouse/core/constants.dart';
+import 'package:renthouse/models/chat_model.dart';
 import 'package:renthouse/models/house_model.dart';
 import 'package:renthouse/models/user_model.dart';
 import 'package:renthouse/models/order_model.dart';
 import 'package:renthouse/models/notification_model.dart';
+import 'package:renthouse/screens/chat_detail_screen.dart';
 import 'package:renthouse/screens/order_detail_screen.dart';
+import 'package:renthouse/screens/reviews_screen.dart';
+import 'package:renthouse/services/auth_service.dart';
 import 'package:renthouse/services/database_service.dart';
 import 'package:renthouse/utils/helpers.dart';
 import 'package:renthouse/widgets/custom_app_bar.dart';
 import 'package:renthouse/widgets/custom_button.dart';
+import 'package:renthouse/widgets/image_carousel.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 
@@ -28,6 +33,101 @@ class HouseDetailScreen extends StatefulWidget {
 
 class _HouseDetailScreenState extends State<HouseDetailScreen> {
   final DatabaseService _databaseService = DatabaseService();
+  final AuthService _authService = AuthService();
+  bool _isFavorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIfFavorite();
+  }
+
+  Future<void> _checkIfFavorite() async {
+    final userId = _authService.getCurrentUser()?.uid;
+    if (userId != null) {
+      final isFav = await _databaseService.isFavorite(userId, widget.house.houseId);
+      setState(() {
+        _isFavorite = isFav;
+      });
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    final userId = _authService.getCurrentUser()?.uid;
+    if (userId == null) return;
+
+    setState(() {
+      _isFavorite = !_isFavorite;
+    });
+
+    try {
+      if (_isFavorite) {
+        await _databaseService.addToFavorites(userId, widget.house.houseId);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Added to favorites')),
+        );
+      } else {
+        await _databaseService.removeFromFavorites(userId, widget.house.houseId);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Removed from favorites')),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isFavorite = !_isFavorite; // Revert on error
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  Future<void> _startChat() async {
+    final currentUser = _authService.getCurrentUser();
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login to chat')),
+      );
+      return;
+    }
+
+    try {
+      final chatId = await _databaseService.createOrGetChat(
+        currentUser.uid,
+        widget.house.landlordId,
+        widget.house.houseId,
+      );
+
+      final landlord = await _databaseService.getUser(widget.house.landlordId);
+      if (landlord == null || !mounted) return;
+
+      final chatDoc = await FirebaseFirestore.instance
+          .collection(AppConstants.chatsCollection)
+          .doc(chatId)
+          .get();
+
+      if (!chatDoc.exists || !mounted) return;
+
+      final chatData = chatDoc.data()!;
+      final chat = ChatModel.fromMap(chatData);
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatDetailScreen(
+            chat: chat,
+            currentUser: widget.currentUser,
+            otherUser: landlord,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error starting chat: $e')),
+      );
+    }
+  }
 
   Future<void> _requestHouse() async {
     if (widget.currentUser == null) return;
@@ -101,43 +201,54 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Prepare images list
+    final List<String> images = widget.house.images.isNotEmpty
+        ? widget.house.images
+        : (widget.house.imageUrl.isNotEmpty ? [widget.house.imageUrl] : []);
+
     return Scaffold(
-      appBar: CustomAppBar(
-        title: 'House Details',
-        onBackPress: () {
-          Navigator.pop(context);
-        },
+      appBar: AppBar(
+        title: const Text('House Details'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _isFavorite ? Colors.red : Colors.black,
+            ),
+            onPressed: _toggleFavorite,
+          ),
+          IconButton(
+            icon: const Icon(Icons.share, color: Colors.black),
+            onPressed: () {
+              // TODO: Implement share functionality
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Share feature coming soon!')),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // House image
-            Container(
-              width: double.infinity,
-              height: 250,
-              child: widget.house.imageUrl.isNotEmpty
-                ? Image.network(
-                    widget.house.imageUrl,
-                    width: double.infinity,
-                    height: 250,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Image.asset(
-                        AppConstants.defaultHouseImage,
-                        width: double.infinity,
-                        height: 250,
-                        fit: BoxFit.cover,
-                      );
-                    },
-                  )
-                : Image.asset(
-                    AppConstants.defaultHouseImage,
-                    width: double.infinity,
-                    height: 250,
-                    fit: BoxFit.cover,
-                  ),
-            ),
+            // House image carousel
+            if (images.isNotEmpty)
+              ImageCarousel(images: images)
+            else
+              Container(
+                width: double.infinity,
+                height: 250,
+                color: Colors.grey[200],
+                child: Icon(
+                  Icons.image_not_supported,
+                  size: 60,
+                  color: Colors.grey[400],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -212,7 +323,71 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
                   const SizedBox(height: 10),
                   _buildIconDetailRow(Icons.square_foot, 'Area', '${widget.house.area} Marla'),
                   _buildIconDetailRow(Icons.home, 'Type', widget.house.houseType),
+                  _buildIconDetailRow(Icons.meeting_room, 'Rooms', '${widget.house.numberOfRooms}'),
                   _buildIconDetailRow(Icons.location_on, 'Location', widget.house.location),
+                  
+                  // Status badge
+                  if (widget.house.status.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: widget.house.status == 'available'
+                              ? Colors.green.withOpacity(0.1)
+                              : widget.house.status == 'rented'
+                                  ? Colors.orange.withOpacity(0.1)
+                                  : Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: widget.house.status == 'available'
+                                ? Colors.green
+                                : widget.house.status == 'rented'
+                                    ? Colors.orange
+                                    : Colors.red,
+                          ),
+                        ),
+                        child: Text(
+                          widget.house.status.toUpperCase(),
+                          style: TextStyle(
+                            color: widget.house.status == 'available'
+                                ? Colors.green
+                                : widget.house.status == 'rented'
+                                    ? Colors.orange
+                                    : Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  
+                  // Amenities
+                  if (widget.house.amenities.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Amenities',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: widget.house.amenities.map((amenity) {
+                        return Chip(
+                          label: Text(
+                            amenity,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                          side: BorderSide(color: Theme.of(context).primaryColor),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   // Landlord info
                   const Text(
@@ -239,10 +414,35 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
                     },
                   ),
                   const SizedBox(height: 30),
+                  // Reviews Button
+                  CustomButton(
+                    text: 'View Reviews & Ratings',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ReviewsScreen(
+                            house: widget.house,
+                            currentUser: widget.currentUser,
+                          ),
+                        ),
+                      );
+                    },
+                    color: Colors.orange,
+                    width: double.infinity,
+                  ),
+                  const SizedBox(height: 10),
                   // Action buttons - full width, separate lines
                   if (widget.currentUser?.userType == AppConstants.userTypeTenant)
                     Column(
                       children: [
+                        CustomButton(
+                          text: 'Chat with Landlord',
+                          onPressed: _startChat,
+                          color: Theme.of(context).primaryColor,
+                          width: double.infinity,
+                        ),
+                        const SizedBox(height: 10),
                         CustomButton(
                           text: 'WhatsApp',
                           onPressed: _contactViaWhatsApp,
@@ -253,7 +453,7 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
                         CustomButton(
                           text: 'Request House',
                           onPressed: _requestHouse,
-                          color: Theme.of(context).primaryColor,
+                          color: Colors.blue,
                           width: double.infinity,
                         ),
                       ],
