@@ -7,7 +7,6 @@ import 'package:renthouse/widgets/custom_app_bar.dart';
 import 'package:renthouse/widgets/custom_button.dart';
 import 'package:renthouse/widgets/custom_text_field.dart';
 import 'package:renthouse/widgets/location_picker.dart';
-import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:renthouse/services/cloudinary_service.dart';
@@ -99,13 +98,13 @@ class _EditHouseScreenState extends State<EditHouseScreen> {
   }
 
   Future<void> _pickImages() async {
-    final List<XFile>? pickedFiles = await ImagePicker().pickMultiImage(
+    final List<XFile> pickedFiles = await ImagePicker().pickMultiImage(
       maxWidth: 1920,
       maxHeight: 1080,
       imageQuality: 85,
     );
     
-    if (pickedFiles != null && pickedFiles.isNotEmpty) {
+    if (pickedFiles.isNotEmpty) {
       setState(() {
         _selectedImages.addAll(pickedFiles.take(10 - _existingImages.length - _selectedImages.length));
       });

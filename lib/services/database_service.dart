@@ -551,7 +551,7 @@ class DatabaseService {
           .map((doc) => ReviewModel.fromMap(doc.data()))
           .toList();
 
-      final totalRating = reviews.fold(0, (sum, review) => sum + review.rating);
+      final totalRating = reviews.fold(0, (currentSum, review) => currentSum + review.rating);
       return totalRating / reviews.length;
     } catch (e) {
       return 0.0;

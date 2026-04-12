@@ -604,6 +604,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       
       await _databaseService.deleteHouse(house.houseId);
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('House deleted successfully!')),
       );
@@ -611,6 +612,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Refresh the UI to reflect the deletion
       setState(() {});
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error deleting house: ${e.toString()}')),
       );

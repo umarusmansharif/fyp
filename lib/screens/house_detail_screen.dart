@@ -11,7 +11,6 @@ import 'package:renthouse/screens/reviews_screen.dart';
 import 'package:renthouse/services/auth_service.dart';
 import 'package:renthouse/services/database_service.dart';
 import 'package:renthouse/utils/helpers.dart';
-import 'package:renthouse/widgets/custom_app_bar.dart';
 import 'package:renthouse/widgets/custom_button.dart';
 import 'package:renthouse/widgets/image_carousel.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -63,11 +62,13 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
     try {
       if (_isFavorite) {
         await _databaseService.addToFavorites(userId, widget.house.houseId);
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Added to favorites')),
         );
       } else {
         await _databaseService.removeFromFavorites(userId, widget.house.houseId);
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Removed from favorites')),
         );
@@ -76,6 +77,7 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
       setState(() {
         _isFavorite = !_isFavorite; // Revert on error
       });
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );

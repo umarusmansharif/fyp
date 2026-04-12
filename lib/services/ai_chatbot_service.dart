@@ -1,11 +1,15 @@
+// ignore: unused_import
 import 'dart:convert';
+// ignore: unused_import
 import 'package:http/http.dart' as http;
 
 class AIChatbotService {
   // You can replace this with your preferred AI API
   // For now, using a rule-based system with predefined responses
   
+  // ignore: unused_field
   static const String _apiKey = 'YOUR_API_KEY'; // Replace with actual API key
+  // ignore: unused_field
   static const String _apiUrl = 'https://api.openai.com/v1/chat/completions';
 
   // Predefined responses for common questions

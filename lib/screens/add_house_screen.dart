@@ -32,12 +32,11 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
   final DatabaseService _databaseService = DatabaseService();
   bool _isLoading = false;
   XFile? _selectedImage;
-  String? _imagePreviewUrl;
   
   // Location fields
   double? _latitude;
   double? _longitude;
-  List<String> _selectedAmenities = [];
+  final List<String> _selectedAmenities = [];
   String _propertyStatus = AppConstants.propertyStatusAvailable;
   
   final List<String> _commonAmenities = [
@@ -170,7 +169,6 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
         _houseTypeController.clear();
         _roomsController.clear();
         _selectedImage = null;
-        _imagePreviewUrl = null;
         _latitude = null;
         _longitude = null;
         _selectedAmenities.clear();

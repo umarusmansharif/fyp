@@ -14,7 +14,7 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   
-  List<Map<String, dynamic>> _messages = [];
+  final List<Map<String, dynamic>> _messages = [];
   bool _isTyping = false;
 
   @override

@@ -66,7 +66,7 @@ class CloudinaryService {
       
       if (response.statusCode == 200) {
         // Parse the successful response
-        var responseData;
+        dynamic responseData;
         try {
           responseData = json.decode(responseString);
           print('Parsed response data: $responseData');

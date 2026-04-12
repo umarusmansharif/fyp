@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/models/house_model.dart';
@@ -19,6 +20,8 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
+  String _searchQuery = '';
   
   // Filter states
   double? _minPrice;
@@ -30,6 +33,7 @@ class _SearchScreenState extends State<SearchScreen> {
   
   bool _showFilters = false;
   bool _isGridView = false;
+  int _activeFilterCount = 0;
 
   final List<String> _commonAmenities = [
     'Parking',
@@ -52,11 +56,36 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
+  void _onSearchChanged(String value) {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          _searchQuery = value.trim();
+        });
+      }
+    });
+  }
+
+  void _updateFilterCount() {
+    int count = 0;
+    if (_minPrice != null) count++;
+    if (_maxPrice != null) count++;
+    if (_propertyType != null) count++;
+    if (_rooms != null) count++;
+    if (_selectedAmenities.isNotEmpty) count++;
+    setState(() {
+      _activeFilterCount = count;
+    });
+  }
+
   void _applyFilters() {
+    _updateFilterCount();
     setState(() {
       _showFilters = false;
     });
@@ -70,6 +99,8 @@ class _SearchScreenState extends State<SearchScreen> {
       _rooms = null;
       _selectedAmenities = [];
       _searchController.clear();
+      _searchQuery = '';
+      _activeFilterCount = 0;
     });
   }
 
@@ -114,6 +145,12 @@ class _SearchScreenState extends State<SearchScreen> {
               decoration: BoxDecoration(
                 color: Colors.grey[100],
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _searchQuery.isNotEmpty
+                      ? Theme.of(context).primaryColor.withOpacity(0.5)
+                      : Colors.transparent,
+                  width: 2,
+                ),
               ),
               child: TextField(
                 controller: _searchController,
@@ -121,21 +158,34 @@ class _SearchScreenState extends State<SearchScreen> {
                   hintText: 'Search by location, title...',
                   prefixIcon: const Icon(Icons.search, color: Colors.grey),
                   suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, color: Colors.grey),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                            });
-                          },
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_searchQuery.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: Icon(
+                                  Icons.check_circle,
+                                  color: Theme.of(context).primaryColor,
+                                  size: 20,
+                                ),
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.clear, color: Colors.grey),
+                              onPressed: () {
+                                setState(() {
+                                  _searchController.clear();
+                                  _searchQuery = '';
+                                });
+                              },
+                            ),
+                          ],
                         )
                       : null,
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 15),
                 ),
-                onChanged: (value) {
-                  setState(() {});
-                },
+                onChanged: _onSearchChanged,
               ),
             ),
           ),
@@ -152,16 +202,20 @@ class _SearchScreenState extends State<SearchScreen> {
                         _showFilters = !_showFilters;
                       });
                     },
-                    icon: Icon(
-                      _showFilters ? Icons.filter_alt_off : Icons.filter_list,
-                      size: 20,
+                    icon: Badge(
+                      isLabelVisible: _activeFilterCount > 0,
+                      label: Text('$_activeFilterCount'),
+                      child: Icon(
+                        _showFilters ? Icons.filter_alt_off : Icons.filter_list,
+                        size: 20,
+                      ),
                     ),
                     label: Text(_showFilters ? 'Hide Filters' : 'Filters'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _showFilters
+                      backgroundColor: _showFilters || _activeFilterCount > 0
                           ? Theme.of(context).primaryColor
                           : Colors.white,
-                      foregroundColor: _showFilters
+                      foregroundColor: _showFilters || _activeFilterCount > 0
                           ? Colors.white
                           : Colors.black87,
                       elevation: 0,
@@ -430,7 +484,7 @@ class _SearchScreenState extends State<SearchScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: StreamBuilder<List<HouseModel>>(
               stream: _databaseService.searchHouses(
-                query: _searchController.text.isEmpty ? null : _searchController.text,
+                query: _searchQuery.isEmpty ? null : _searchQuery,
                 minPrice: _minPrice,
                 maxPrice: _maxPrice,
                 propertyType: _propertyType,
@@ -467,7 +521,7 @@ class _SearchScreenState extends State<SearchScreen> {
           Expanded(
             child: StreamBuilder<List<HouseModel>>(
               stream: _databaseService.searchHouses(
-                query: _searchController.text.isEmpty ? null : _searchController.text,
+                query: _searchQuery.isEmpty ? null : _searchQuery,
                 minPrice: _minPrice,
                 maxPrice: _maxPrice,
                 propertyType: _propertyType,
@@ -477,7 +531,16 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Searching properties...'),
+                      ],
+                    ),
+                  );
                 }
 
                 if (snapshot.hasError) {
@@ -487,35 +550,83 @@ class _SearchScreenState extends State<SearchScreen> {
                       children: [
                         Icon(Icons.error_outline, size: 60, color: Colors.red[400]),
                         const SizedBox(height: 16),
-                        Text('Error: ${snapshot.error}'),
+                        const Text(
+                          'Error loading properties',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Text(
+                            '${snapshot.error}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {});
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                        ),
                       ],
                     ),
                   );
                 }
 
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  final hasActiveFilters = _searchQuery.isNotEmpty ||
+                      _minPrice != null ||
+                      _maxPrice != null ||
+                      _propertyType != null ||
+                      _rooms != null ||
+                      _selectedAmenities.isNotEmpty;
+
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.search_off, size: 80, color: Colors.grey[400]),
+                        Icon(
+                          hasActiveFilters ? Icons.filter_list_off : Icons.search_off,
+                          size: 80,
+                          color: Colors.grey[400],
+                        ),
                         const SizedBox(height: 16),
                         Text(
-                          'No properties found',
-                          style: TextStyle(
+                          hasActiveFilters
+                              ? 'No properties match your filters'
+                              : 'No properties found',
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey[600],
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Try adjusting your filters',
+                          hasActiveFilters
+                              ? 'Try adjusting or resetting your filters'
+                              : 'Try adjusting your filters',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey[500],
                           ),
                         ),
+                        if (hasActiveFilters) ...[
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _resetFilters,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Reset Filters'),
+                          ),
+                        ],
                       ],
                     ),
                   );

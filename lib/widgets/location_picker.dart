@@ -20,8 +20,10 @@ class LocationPicker extends StatefulWidget {
 }
 
 class _LocationPickerState extends State<LocationPicker> {
+  // ignore: unused_field
   GoogleMapController? _mapController;
   LatLng? _selectedLocation;
+  // ignore: unused_field
   Position? _currentPosition;
   String _address = '';
   bool _isLoading = true;

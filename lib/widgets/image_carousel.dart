@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:renthouse/core/constants.dart';
 
 class ImageCarousel extends StatefulWidget {
   final List<String> images;
@@ -70,9 +69,8 @@ class _ImageCarouselState extends State<ImageCarousel> {
                 onTap: () {
                   _showFullScreenImage(index);
                 },
-                child: Container(
+                child: SizedBox(
                   width: double.infinity,
-                  height: widget.height,
                   child: Image.network(
                     widget.images[index],
                     fit: BoxFit.cover,

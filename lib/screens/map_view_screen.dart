@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/models/house_model.dart';
 import 'package:renthouse/models/user_model.dart';
 import 'package:renthouse/screens/house_detail_screen.dart';
@@ -132,6 +131,7 @@ class _MapViewScreenState extends State<MapViewScreen> {
     if (await canLaunchUrl(Uri.parse(url))) {
       await launchUrl(Uri.parse(url));
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not open maps')),
       );

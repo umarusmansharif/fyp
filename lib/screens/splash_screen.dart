@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/screens/auth/login_screen.dart';
 import 'package:renthouse/screens/dashboard_screen.dart';
 import 'package:renthouse/services/auth_service.dart';
@@ -11,17 +10,29 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
   final AuthService _authService = AuthService();
+  late AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+
     _navigateToNextScreen();
   }
 
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
   Future<void> _navigateToNextScreen() async {
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 3));
 
     if (!mounted) return;
 
@@ -52,92 +63,109 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+
     return Scaffold(
-      backgroundColor: Colors.black,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Background image with blur effect
-          Image.asset(
-            AppConstants.splashImage,
-            fit: BoxFit.cover,
-          ),
-          // Dark overlay for better text visibility
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(0.2),
-                  Colors.black.withOpacity(0.8),
-                ],
-                stops: [0.6, 1.0],
+          // Top Section - Original Splash Image
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: screenHeight * 0.55,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(40),
+                  bottomRight: Radius.circular(40),
+                ),
+                child: Image.asset(
+                  'assets/images/splash.jpg',
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                ),
               ),
             ),
           ),
-          // Content
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Logo/Icon with scale animation
-              Transform.scale(
-                scale: 1.2,
-                child: Image.asset(
-                  AppConstants.splashImage,
-                  width: 180,
-                  height: 180,
-                  fit: BoxFit.contain,
+
+          // Bottom Container - Enhanced Design
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: screenHeight * 0.50,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(40),
+                  topRight: Radius.circular(40),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 40,
+                    offset: const Offset(0, -15),
+                    spreadRadius: 10,
+                  ),
+                ],
               ),
-              const SizedBox(height: 40),
-              // App name with fade-in effect
-              Opacity(
-                opacity: 1.0,
-                child: Text(
-                  AppConstants.appName,
-                  style: const TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: 1.5,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black54,
-                        offset: Offset(2, 2),
-                        blurRadius: 8,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Spacer(),
+
+                    // Modern Animated Loader - Pulse Dots
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(3, (index) {
+                        return AnimatedBuilder(
+                          animation: _pulseController,
+                          builder: (context, child) {
+                            return Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 6),
+                              child: Transform.scale(
+                                scale: 0.6 + (_pulseController.value * 0.4),
+                                child: Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFF1A237E).withOpacity(
+                                      0.3 + (_pulseController.value * 0.7),
+                                    ),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      }),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // Loading Text
+                    Text(
+                      'Please wait, loading your experience...',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.5,
                       ),
-                    ],
-                  ),
+                    ),
+
+                    const Spacer(),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              // Tagline
-              Opacity(
-                opacity: 0.9,
-                child: Text(
-                  'Smart House Rental Solution',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 60),
-              // Subtle loading indicator
-              const Opacity(
-                opacity: 0.7,
-                child: SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    strokeWidth: 3.0,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),

@@ -58,10 +58,19 @@ dependencies:
   # HTTP for API calls
   http: ^1.2.2
   
+  # Path utilities for file handling
+  path: ^1.9.0
+  
   # Google Maps and Location
   google_maps_flutter: ^2.5.0
   geolocator: ^10.1.0
   geocoding: ^2.1.1
+  
+  # Google Sign-In
+  google_sign_in: ^6.2.1
+  
+  # Sign In Button
+  sign_in_button: ^3.2.0
 
 dev_dependencies:
   flutter_test:
