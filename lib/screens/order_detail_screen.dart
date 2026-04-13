@@ -24,15 +24,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<void> _updateOrderStatus(String status) async {
     try {
+      // Update order status
       await FirebaseFirestore.instance
           .collection(AppConstants.ordersCollection)
           .doc(widget.order.orderId)
           .update({'status': status});
 
+      // If order is accepted, update property status to "Rented"
+      if (status == AppConstants.orderStatusAccepted) {
+        await FirebaseFirestore.instance
+            .collection(AppConstants.housesCollection)
+            .doc(widget.order.houseId)
+            .update({'status': AppConstants.propertyStatusRented});
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order status updated successfully!')),
       );
+      
+      // Refresh the screen
+      if (mounted && status == AppConstants.orderStatusAccepted) {
+        Navigator.pop(context, true); // Return true to indicate status changed
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -215,28 +229,36 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildInfoCard(String label, String value) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
+    return Container(
+      width: double.infinity,
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

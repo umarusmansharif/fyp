@@ -19,7 +19,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     super.initState();
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
 
     _navigateToNextScreen();
@@ -119,45 +119,64 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                   children: [
                     const Spacer(),
 
-                    // Modern Animated Loader - Pulse Dots
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(3, (index) {
-                        return AnimatedBuilder(
-                          animation: _pulseController,
-                          builder: (context, child) {
-                            return Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 6),
-                              child: Transform.scale(
-                                scale: 0.6 + (_pulseController.value * 0.4),
-                                child: Container(
-                                  width: 16,
-                                  height: 16,
+                    // Modern Animated Dot Loader - 4 dots horizontal left-to-right
+                    SizedBox(
+                      height: 20,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(4, (index) {
+                          return AnimatedBuilder(
+                            animation: _pulseController,
+                            builder: (context, child) {
+                              // Calculate staggered animation for each dot
+                              final staggeredValue = (_pulseController.value + (index * 0.25)) % 1.0;
+                              
+                              // Color transition: Dark Blue <-> White
+                              final isPrimary = staggeredValue > 0.5;
+                              final dotColor = isPrimary ? Color(0xFF1A237E) : Colors.white;
+                              final shadowOpacity = isPrimary ? 0.3 : 0.1;
+
+                              return Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 6),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 100),
+                                  width: 12,
+                                  height: 12,
                                   decoration: BoxDecoration(
-                                    color: Color(0xFF1A237E).withOpacity(
-                                      0.3 + (_pulseController.value * 0.7),
-                                    ),
+                                    color: dotColor,
                                     shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Color(0xFF1A237E),
+                                      width: 2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Color(0xFF1A237E).withOpacity(shadowOpacity),
+                                        blurRadius: 6,
+                                        spreadRadius: 1,
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
-                            );
-                          },
-                        );
-                      }),
+                              );
+                            },
+                          );
+                        }),
+                      ),
                     ),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 40),
 
-                    // Loading Text
+                    // Loading Text - Enhanced visibility
                     Text(
-                      'Please wait, loading your experience...',
+                      'Please wait... loading your experience',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.5,
+                        fontSize: 18,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                        height: 1.4,
                       ),
                     ),
 

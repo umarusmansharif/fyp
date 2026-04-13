@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/models/house_model.dart';
 import 'package:renthouse/models/user_model.dart';
@@ -27,6 +28,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   UserModel? _currentUser;
   int _currentIndex = 0;
   int _selectedCategory = 0;
+  Position? _userPosition;
+  bool _isLoadingLocation = false;
 
   @override
   void initState() {
@@ -40,6 +43,75 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final userData = await _databaseService.getUser(user.uid);
       setState(() {
         _currentUser = userData;
+      });
+    }
+  }
+  
+  Future<void> _getUserLocation() async {
+    setState(() {
+      _isLoadingLocation = true;
+    });
+    
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enable location services'),
+            backgroundColor: Color(0xFFF59E0B),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        setState(() {
+          _isLoadingLocation = false;
+        });
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _isLoadingLocation = false;
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location permission permanently denied'),
+            backgroundColor: Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        setState(() {
+          _isLoadingLocation = false;
+        });
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      setState(() {
+        _userPosition = position;
+        _selectedCategory = 1; // Switch to "Near You" tab
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error getting location: $e'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoadingLocation = false;
       });
     }
   }
@@ -120,30 +192,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              // Welcome text
+              // Welcome text - Role-based
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Welcome, ${_currentUser?.name ?? 'User'}',
                     style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                      letterSpacing: 0.3,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Find your home here',
+                  const SizedBox(height: 6),
+                  Text(
+                    _getRoleBasedWelcome(),
                     style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
+                      fontSize: 15,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              // Search bar
+              const SizedBox(height: 24),
+              // Search bar - Enhanced
               GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -154,20 +229,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   );
                 },
                 child: Container(
-                  height: 50,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  height: 54,
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.grey[200]!, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.search, color: Colors.grey),
-                      const SizedBox(width: 12),
+                      Icon(Icons.search, color: Colors.grey[600], size: 22),
+                      const SizedBox(width: 14),
                       Text(
-                        'Search houses...',
-                        style: TextStyle(color: Colors.grey[500]),
+                        'Search houses by location, price...',
+                        style: TextStyle(color: Colors.grey[500], fontSize: 15),
                       ),
                     ],
                   ),
@@ -180,7 +262,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
-                    _buildCategoryTab('Top Recommended', 0),
+                    _buildCategoryTab('New Listings', 0),
                     const SizedBox(width: 12),
                     _buildCategoryTab('Near You', 1),
                     const SizedBox(width: 12),
@@ -191,7 +273,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 20),
               // Horizontal house gallery
               const Text(
-                'Recommended For You',
+                'New Listings',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -233,9 +315,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     }
 
                     final houses = snapshot.data!;
+                    
+                    // Sort by distance if "Near You" is selected and location is available
+                    List<HouseModel> sortedHouses = List.from(houses);
+                    if (_selectedCategory == 1 && _userPosition != null) {
+                      sortedHouses.sort((a, b) {
+                        double distanceA = _calculateDistance(
+                          _userPosition!.latitude,
+                          _userPosition!.longitude,
+                          a.latitude,
+                          a.longitude,
+                        );
+                        double distanceB = _calculateDistance(
+                          _userPosition!.latitude,
+                          _userPosition!.longitude,
+                          b.latitude,
+                          b.longitude,
+                        );
+                        return distanceA.compareTo(distanceB);
+                      });
+                      
+                      // Filter houses within 50km radius
+                      sortedHouses = sortedHouses.where((house) {
+                        double distance = _calculateDistance(
+                          _userPosition!.latitude,
+                          _userPosition!.longitude,
+                          house.latitude,
+                          house.longitude,
+                        );
+                        return distance <= 50; // 50 km radius
+                      }).toList();
+                    }
 
                     // Show first few houses in the main gallery
-                    final mainHouses = houses.take(5).toList();
+                    final mainHouses = sortedHouses.take(5).toList();
 
                     return ListView.builder(
                       scrollDirection: Axis.horizontal,
@@ -267,9 +380,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              // Best Offer section
+              // New Listings section
               const Text(
-                'Best Offer',
+                'New Listings',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -379,30 +492,72 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: _buildFloatingActionButton(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    );
+  }
+
+  Widget _buildFloatingActionButton() {
+    // Show different FAB based on user role
+    if (_currentUser?.userType == AppConstants.userTypeLandlord) {
+      // Landlord: Show Add Listing button
+      return FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => AddHouseScreen()),
+          );
+        },
+        backgroundColor: Color(0xFF1A237E),
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text(
+          'Add Listing',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      );
+    } else {
+      // Tenant: Show AI Assistant button
+      return FloatingActionButton.extended(
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const AIChatbotScreen()),
           );
         },
-        backgroundColor: Theme.of(context).primaryColor,
+        backgroundColor: Color(0xFF1A237E),
         icon: const Icon(Icons.smart_toy, color: Colors.white),
         label: const Text(
           'AI Assistant',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-    );
+      );
+    }
   }
 
   Widget _buildCategoryTab(String title, int index) {
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _selectedCategory = index;
-        });
+        if (index == 1) {
+          // "Near You" tab - request location
+          _getUserLocation();
+        } else if (index == 2) {
+          // "Your Favorite" tab - navigate to favorites screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => FavoritesScreen(currentUser: _currentUser),
+            ),
+          ).then((_) {
+            // Reset to home tab when returning
+            setState(() {
+              _selectedCategory = 0;
+            });
+          });
+        } else {
+          setState(() {
+            _selectedCategory = index;
+          });
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -507,5 +662,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ],
     );
+  }
+
+  String _getRoleBasedWelcome() {
+    if (_currentUser?.userType == AppConstants.userTypeLandlord) {
+      return 'Manage your properties and listings';
+    } else {
+      return 'Find your dream home';
+    }
+  }
+  
+  // Calculate distance between two coordinates using Haversine formula
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371; // Earth's radius in kilometers
+    
+    double dLat = _toRadians(lat2 - lat1);
+    double dLon = _toRadians(lon2 - lon1);
+    
+    double a = 
+      _sin2(dLat / 2) +
+      _cos(lat1) * _cos(lat2) * _sin2(dLon / 2);
+    
+    double c = 2 * _atan2(_sqrt(a), _sqrt(1 - a));
+    
+    return earthRadius * c;
+  }
+  
+  double _toRadians(double degrees) {
+    return degrees * (3.141592653589793 / 180.0);
+  }
+  
+  double _sin2(double x) {
+    return _sin(x) * _sin(x);
+  }
+  
+  double _sin(double x) {
+    return x - (x * x * x) / 6 + (x * x * x * x * x) / 120;
+  }
+  
+  double _cos(double x) {
+    return 1 - (x * x) / 2 + (x * x * x * x) / 24;
+  }
+  
+  double _sqrt(double x) {
+    if (x == 0) return 0;
+    double result = x;
+    for (int i = 0; i < 10; i++) {
+      result = (result + x / result) / 2;
+    }
+    return result;
+  }
+  
+  double _atan2(double y, double x) {
+    if (x > 0) return _atan(y / x);
+    if (x < 0 && y >= 0) return _atan(y / x) + 3.141592653589793;
+    if (x < 0 && y < 0) return _atan(y / x) - 3.141592653589793;
+    if (x == 0 && y > 0) return 3.141592653589793 / 2;
+    if (x == 0 && y < 0) return -3.141592653589793 / 2;
+    return 0;
+  }
+  
+  double _atan(double x) {
+    return x - (x * x * x) / 3 + (x * x * x * x * x) / 5;
   }
 }

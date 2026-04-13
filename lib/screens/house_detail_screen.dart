@@ -288,11 +288,15 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
                         color: Colors.grey,
                       ),
                       const SizedBox(width: 5),
-                      Text(
-                        widget.house.location,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
+                      Expanded(
+                        child: Text(
+                          widget.house.location,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -430,7 +434,7 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
                         ),
                       );
                     },
-                    color: Colors.orange,
+                    color: const Color(0xFF1A237E),
                     width: double.infinity,
                   ),
                   const SizedBox(height: 10),

@@ -86,10 +86,19 @@ class _SignupScreenState extends State<SignupScreen> {
       body: SafeArea(
         child: GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 24),
-            child: ConstrainedBox(
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Color(0xFF1A237E).withOpacity(0.15),
+                width: 2,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(4),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 24),
+              child: ConstrainedBox(
               constraints: BoxConstraints(
                 minHeight: screenHeight,
               ),
@@ -490,6 +499,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ],
               ),
+            ),
             ),
           ),
         ),

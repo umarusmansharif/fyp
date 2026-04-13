@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:renthouse/models/house_model.dart';
 import 'package:renthouse/models/user_model.dart';
 import 'package:renthouse/screens/house_detail_screen.dart';
@@ -23,12 +24,90 @@ class _MapViewScreenState extends State<MapViewScreen> {
   Set<Marker> _markers = {};
   bool _isLoading = true;
   HouseModel? _selectedProperty;
+  TextEditingController _searchController = TextEditingController();
+  bool _isSearching = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
     _loadProperties();
+  }
+
+  Future<void> _searchLocation(String query) async {
+    if (query.isEmpty) return;
+
+    setState(() {
+      _isSearching = true;
+    });
+
+    try {
+      // Use geocoding to convert address to coordinates
+      List<Location> locations = await locationFromAddress(query);
+      
+      if (locations.isNotEmpty && _mapController != null) {
+        Location location = locations.first;
+        
+        // Animate camera to searched location
+        _mapController!.animateCamera(
+          CameraUpdate.newLatLngZoom(
+            LatLng(location.latitude, location.longitude),
+            14,
+          ),
+        );
+
+        // Add a temporary marker for searched location
+        setState(() {
+          _markers.add(
+            Marker(
+              markerId: MarkerId('search_${DateTime.now().millisecondsSinceEpoch}'),
+              position: LatLng(location.latitude, location.longitude),
+              infoWindow: InfoWindow(
+                title: query,
+                snippet: 'Searched Location',
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueRed,
+              ),
+            ),
+          );
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Found: $query'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location not found'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isSearching = false;
+      });
+    }
   }
 
   Future<void> _getCurrentLocation() async {
@@ -186,6 +265,57 @@ class _MapViewScreenState extends State<MapViewScreen> {
                     });
                   },
                 ),
+
+          // Search Bar Overlay
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: _searchController,
+                onSubmitted: _searchLocation,
+                decoration: InputDecoration(
+                  hintText: 'Search city or location...',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
+                  suffixIcon: _isSearching
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : IconButton(
+                          icon: Icon(Icons.clear, color: Colors.grey[400]),
+                          onPressed: () {
+                            _searchController.clear();
+                          },
+                        ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+            ),
+          ),
 
           // Selected Property Card
           if (_selectedProperty != null)

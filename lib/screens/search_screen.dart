@@ -34,6 +34,7 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _showFilters = false;
   bool _isGridView = false;
   int _activeFilterCount = 0;
+  bool _filtersApplied = false; // Track if any filter has been applied
 
   final List<String> _commonAmenities = [
     'Parking',
@@ -88,6 +89,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _updateFilterCount();
     setState(() {
       _showFilters = false;
+      _filtersApplied = true; // Mark that filters have been applied
     });
   }
 
@@ -101,6 +103,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _searchController.clear();
       _searchQuery = '';
       _activeFilterCount = 0;
+      _filtersApplied = false; // Reset filter applied status
     });
   }
 
@@ -530,6 +533,40 @@ class _SearchScreenState extends State<SearchScreen> {
                 status: AppConstants.propertyStatusAvailable,
               ),
               builder: (context, snapshot) {
+                // Show empty state if no filters applied
+                if (!_filtersApplied && _searchQuery.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.filter_list,
+                          size: 80,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Apply filters to search',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Use the search bar or filter options to find properties',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
                     child: Column(

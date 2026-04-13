@@ -172,9 +172,16 @@ class DatabaseService {
             'price': house.price,
             'description': house.description,
             'location': house.location,
+            'latitude': house.latitude,
+            'longitude': house.longitude,
             'area': house.area,
             'houseType': house.houseType,
-            'imageUrl': house.imageUrl,
+            'numberOfRooms': house.numberOfRooms,
+            'images': house.images,
+            'imageUrl': house.images.isNotEmpty ? house.images.first : '',
+            'amenities': house.amenities,
+            'status': house.status,
+            'updatedAt': house.updatedAt,
             // Note: We don't update landlordId, houseId, or createdAt as these shouldn't change
           });
     } catch (e) {

@@ -680,6 +680,7 @@ class _EditHouseScreenState extends State<EditHouseScreen> {
                   text: 'Update House',
                   onPressed: _updateHouse,
                   isLoading: _isLoading,
+                  width: double.infinity,
                 ),
               ],
             ),

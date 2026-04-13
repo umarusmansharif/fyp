@@ -31,7 +31,7 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   bool _isLoading = false;
-  XFile? _selectedImage;
+  List<XFile> _selectedImages = [];
   
   // Location fields
   double? _latitude;
@@ -72,15 +72,23 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
   }
 
   Future<void> _pickImage() async {
-    final XFile? pickedFile = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
+    final List<XFile> pickedFiles = await ImagePicker().pickMultiImage(
+      maxWidth: 1920,
+      maxHeight: 1080,
+      imageQuality: 85,
     );
     
-    if (pickedFile != null) {
+    if (pickedFiles.isNotEmpty) {
       setState(() {
-        _selectedImage = pickedFile;
+        _selectedImages.addAll(pickedFiles);
       });
     }
+  }
+  
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+    });
   }
 
   @override
@@ -106,33 +114,39 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
           throw 'User not authenticated';
         }
 
-        String imageUrl = '';
+        // Validate location is selected
+        if (_latitude == null || _longitude == null) {
+          throw 'Please select a location on map';
+        }
         
-        // Upload image to Cloudinary if selected
-        if (_selectedImage != null) {
-          final imageFile = File(_selectedImage!.path);
+        // Validate at least one image is selected
+        if (_selectedImages.isEmpty) {
+          throw 'Please select at least one image';
+        }
+
+        List<String> imageUrls = [];
+        
+        // Upload all images to Cloudinary
+        for (var image in _selectedImages) {
+          final imageFile = File(image.path);
           print('Attempting to upload image: ${imageFile.path}');
-          print('File exists: ${await imageFile.exists()}');
           
           if (!await imageFile.exists()) {
-            throw Exception('Selected image file does not exist');
+            continue;
           }
           
           try {
             String? uploadedImageUrl = await CloudinaryService.uploadImageToCloudinary(imageFile);
-            print('Cloudinary service returned: $uploadedImageUrl');
-            
-            if (uploadedImageUrl == null) {
-              throw Exception('Image upload failed - no URL returned from Cloudinary');
+            if (uploadedImageUrl != null) {
+              imageUrls.add(uploadedImageUrl);
             }
-            imageUrl = uploadedImageUrl;
           } catch (e) {
-            print('Error during Cloudinary upload: $e');
-            if (!mounted) return;
-            throw Exception('Image upload failed: $e');
+            print('Error uploading image: $e');
           }
-        } else {
-          throw 'Please select an image for the house';
+        }
+        
+        if (imageUrls.isEmpty) {
+          throw 'Image upload failed. Please try again.';
         }
 
         final house = HouseModel(
@@ -147,7 +161,7 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
           area: double.tryParse(_areaController.text.trim()) ?? 0.0,
           houseType: _houseTypeController.text.trim(),
           numberOfRooms: int.tryParse(_roomsController.text.trim()) ?? 0,
-          images: imageUrl.isNotEmpty ? [imageUrl] : [],
+          images: imageUrls,
           amenities: _selectedAmenities,
           status: _propertyStatus,
           createdAt: DateTime.now(),
@@ -168,7 +182,7 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
         _areaController.clear();
         _houseTypeController.clear();
         _roomsController.clear();
-        _selectedImage = null;
+        _selectedImages.clear();
         _latitude = null;
         _longitude = null;
         _selectedAmenities.clear();
@@ -482,29 +496,66 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
                       ),
                       Padding(
                         padding: const EdgeInsets.all(12),
-                        child: _selectedImage != null
+                        child: _selectedImages.isNotEmpty
                             ? Column(
                                 children: [
-                                  Container(
-                                    height: 150, // Reduced height to prevent overflow
-                                    width: double.infinity,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(8),
-                                      color: Colors.grey[100],
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.file(
-                                        File(_selectedImage!.path),
-                                        fit: BoxFit.cover,
-                                      ),
+                                  // Image Gallery
+                                  SizedBox(
+                                    height: 150,
+                                    child: ListView.builder(
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: _selectedImages.length,
+                                      itemBuilder: (context, index) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(right: 8),
+                                          child: Stack(
+                                            children: [
+                                              Container(
+                                                width: 150,
+                                                height: 150,
+                                                decoration: BoxDecoration(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  color: Colors.grey[100],
+                                                ),
+                                                child: ClipRRect(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  child: Image.file(
+                                                    File(_selectedImages[index].path),
+                                                    fit: BoxFit.cover,
+                                                  ),
+                                                ),
+                                              ),
+                                              // Remove button
+                                              Positioned(
+                                                top: 4,
+                                                right: 4,
+                                                child: GestureDetector(
+                                                  onTap: () => _removeImage(index),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.all(4),
+                                                    decoration: const BoxDecoration(
+                                                      color: Colors.red,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.close,
+                                                      size: 16,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
                                     ),
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
-                                    'Image selected',
+                                    '${_selectedImages.length} image(s) selected',
                                     style: TextStyle(
-                                      color: Colors.green[600],
+                                      color: Colors.blue[600],
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -522,7 +573,7 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
                                     ),
                                     const SizedBox(height: 10),
                                     const Text(
-                                      'Tap to select an image',
+                                      'Tap to select images',
                                       style: TextStyle(
                                         color: Colors.grey,
                                       ),
@@ -536,7 +587,7 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
                         child: ElevatedButton.icon(
                           onPressed: _pickImage,
                           icon: const Icon(Icons.add_a_photo),
-                          label: Text(_selectedImage != null ? 'Change Image' : 'Select Image'),
+                          label: Text(_selectedImages.isEmpty ? 'Select Images' : 'Add More Images (${_selectedImages.length})'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(context).colorScheme.primary,
                             foregroundColor: Colors.white,
@@ -551,6 +602,7 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
                   text: 'Add House',
                   onPressed: _addHouse,
                   isLoading: _isLoading,
+                  width: double.infinity,
                 ),
               ],
             ),

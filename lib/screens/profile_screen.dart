@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/models/house_model.dart';
 import 'package:renthouse/models/order_model.dart';
@@ -22,6 +23,51 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final DatabaseService _databaseService = DatabaseService();
+  bool _isUploadingImage = false;
+  
+  Future<void> _uploadProfileImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 85,
+    );
+    
+    if (image == null) return;
+    
+    setState(() {
+      _isUploadingImage = true;
+    });
+    
+    try {
+      // TODO: Implement image upload to Cloudinary or Firebase Storage
+      // For now, we'll just show a message
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile image upload requires cloud storage setup'),
+          backgroundColor: Color(0xFFF59E0B),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,15 +88,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Center(
                 child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundImage: widget.user?.profileImage != null && widget.user!.profileImage!.isNotEmpty
-                          ? NetworkImage(widget.user!.profileImage!)
-                          : AssetImage(AppConstants.defaultProfileImage) as ImageProvider,
-                      backgroundColor: Colors.grey[200],
-                      child: widget.user?.profileImage == null || widget.user!.profileImage!.isEmpty
-                          ? Icon(Icons.person, size: 50, color: Colors.grey[500])
-                          : null,
+                    Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 50,
+                          backgroundImage: widget.user?.profileImage != null && widget.user!.profileImage!.isNotEmpty
+                              ? NetworkImage(widget.user!.profileImage!)
+                              : null,
+                          backgroundColor: Colors.grey[200],
+                          child: widget.user?.profileImage == null || widget.user!.profileImage!.isEmpty
+                              ? Icon(Icons.person, size: 50, color: Colors.grey[500])
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: _isUploadingImage ? null : _uploadProfileImage,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A237E),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: _isUploadingImage
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.edit,
+                                      size: 18,
+                                      color: Colors.white,
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 15),
                     Text(
