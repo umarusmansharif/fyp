@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'dart:async';
 
 class LocationPicker extends StatefulWidget {
   final double? initialLatitude;
@@ -28,6 +29,16 @@ class _LocationPickerState extends State<LocationPicker> {
   String _address = '';
   bool _isLoading = true;
   Marker? _selectedMarker;
+  TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
+  bool _isSearching = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounceTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -112,6 +123,78 @@ class _LocationPickerState extends State<LocationPicker> {
     }
   }
 
+  Future<void> _searchLocation(String query) async {
+    if (query.trim().isEmpty) return;
+
+    setState(() {
+      _isSearching = true;
+    });
+
+    try {
+      // Use geocoding to convert address to coordinates
+      List<Location> locations = await locationFromAddress(query);
+      
+      if (locations.isNotEmpty && _mapController != null) {
+        Location location = locations.first;
+        final newLatLng = LatLng(location.latitude, location.longitude);
+        
+        // Animate camera to searched location
+        _mapController!.animateCamera(
+          CameraUpdate.newLatLngZoom(newLatLng, 15),
+        );
+
+        // Update selected location and marker
+        setState(() {
+          _selectedLocation = newLatLng;
+          _address = query;
+          _updateMarker();
+        });
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Found: $query'),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location not found'),
+            backgroundColor: Color(0xFFF59E0B),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+        });
+      }
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 800), () {
+      if (value.trim().isNotEmpty) {
+        _searchLocation(value);
+      }
+    });
+  }
+
   void _updateMarker() {
     if (_selectedLocation != null) {
       setState(() {
@@ -170,6 +253,48 @@ class _LocationPickerState extends State<LocationPicker> {
                     _getAddressFromLatLng(position.latitude, position.longitude);
                   },
                 ),
+
+          // Search Bar at top
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 80,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: _searchController,
+                onChanged: _onSearchChanged,
+                onSubmitted: _searchLocation,
+                decoration: InputDecoration(
+                  hintText: 'Search city or location...',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
+                  suffixIcon: _isSearching
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+            ),
+          ),
 
           // Address display at bottom
           Positioned(

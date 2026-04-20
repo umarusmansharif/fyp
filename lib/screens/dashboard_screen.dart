@@ -72,6 +72,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permission is required to show nearby listings'),
+              backgroundColor: Color(0xFFF59E0B),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
           setState(() {
             _isLoadingLocation = false;
           });
@@ -151,10 +158,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               radius: 20,
               backgroundImage: _currentUser?.profileImage != null && _currentUser!.profileImage!.isNotEmpty
                   ? NetworkImage(_currentUser!.profileImage!)
-                  : const AssetImage(AppConstants.defaultProfileImage) as ImageProvider,
+                  : null,
               backgroundColor: Colors.grey[200],
               child: _currentUser?.profileImage == null || _currentUser!.profileImage!.isEmpty
-                  ? Icon(Icons.person, color: Colors.grey[500])
+                  ? Icon(Icons.person, size: 20, color: Colors.grey[500])
                   : null,
             ),
           ),
@@ -306,6 +313,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     }
 
                     if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      if (_selectedCategory == 1 && _userPosition != null) {
+                        return const Center(
+                          child: Text(
+                            'No houses found nearby',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        );
+                      }
                       return const Center(
                         child: Text(
                           'No houses available',
@@ -380,9 +395,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              // New Listings section
+              // Best Offers section
               const Text(
-                'New Listings',
+                'Best Offers',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

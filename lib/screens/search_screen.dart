@@ -482,43 +482,47 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
 
-          // Results Count
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: StreamBuilder<List<HouseModel>>(
-              stream: _databaseService.searchHouses(
-                query: _searchQuery.isEmpty ? null : _searchQuery,
-                minPrice: _minPrice,
-                maxPrice: _maxPrice,
-                propertyType: _propertyType,
-                rooms: _rooms,
-                amenities: _selectedAmenities.isEmpty ? null : _selectedAmenities,
-                status: AppConstants.propertyStatusAvailable,
-              ),
-              builder: (context, snapshot) {
-                if (snapshot.hasData) {
-                  var houses = snapshot.data!;
-                  
-                  // Apply sorting
-                  if (_sortBy == 'price_low') {
-                    houses.sort((a, b) => a.price.compareTo(b.price));
-                  } else if (_sortBy == 'price_high') {
-                    houses.sort((a, b) => b.price.compareTo(a.price));
-                  }
-                  // 'newest' is already sorted by createdAt descending
+          // Results Count - Only show if filters applied or search query exists
+          if (_filtersApplied || _searchQuery.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: StreamBuilder<List<HouseModel>>(
+                stream: _databaseService.searchHouses(
+                  query: _searchQuery.isEmpty ? null : _searchQuery,
+                  minPrice: _minPrice,
+                  maxPrice: _maxPrice,
+                  propertyType: _propertyType,
+                  rooms: _rooms,
+                  amenities: _selectedAmenities.isEmpty ? null : _selectedAmenities,
+                  status: AppConstants.propertyStatusAvailable,
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    var houses = snapshot.data!;
+                    
+                    // Apply sorting
+                    if (_sortBy == 'price_low') {
+                      houses.sort((a, b) => a.price.compareTo(b.price));
+                    } else if (_sortBy == 'price_high') {
+                      houses.sort((a, b) => b.price.compareTo(a.price));
+                    }
+                    // 'newest' is already sorted by createdAt descending
 
-                  return Text(
-                    '${houses.length} properties found',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
+                    if (houses.isNotEmpty) {
+                      return Text(
+                        '${houses.length} ${houses.length == 1 ? 'property' : 'properties'} found',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      );
+                    }
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
             ),
-          ),
 
           // Results List/Grid
           Expanded(
