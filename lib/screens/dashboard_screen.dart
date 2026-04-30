@@ -334,6 +334,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     // Sort by distance if "Near You" is selected and location is available
                     List<HouseModel> sortedHouses = List.from(houses);
                     if (_selectedCategory == 1 && _userPosition != null) {
+                      // Filter out houses with invalid coordinates first
+                      sortedHouses = sortedHouses.where((house) {
+                        return house.latitude != 0.0 && house.longitude != 0.0;
+                      }).toList();
+                      
+                      // Sort by distance
                       sortedHouses.sort((a, b) {
                         double distanceA = _calculateDistance(
                           _userPosition!.latitude,
@@ -364,6 +370,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                     // Show first few houses in the main gallery
                     final mainHouses = sortedHouses.take(5).toList();
+
+                    // Handle empty state for "Near You" section
+                    if (_selectedCategory == 1 && mainHouses.isEmpty) {
+                      if (_userPosition == null) {
+                        return const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.location_off, size: 48, color: Colors.grey),
+                              SizedBox(height: 16),
+                              Text(
+                                'Enable location to see nearby properties',
+                                style: TextStyle(color: Colors.grey),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        );
+                      } else {
+                        return const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.home_work, size: 48, color: Colors.grey),
+                              SizedBox(height: 16),
+                              Text(
+                                'No properties found within 50km',
+                                style: TextStyle(color: Colors.grey),
+                                textAlign: TextAlign.center,
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Properties with valid location will appear here',
+                                style: TextStyle(color: Colors.grey, fontSize: 12),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    }
 
                     return ListView.builder(
                       scrollDirection: Axis.horizontal,

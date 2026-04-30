@@ -5,6 +5,7 @@ import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/models/order_model.dart';
 import 'package:renthouse/models/user_model.dart';
 import 'package:renthouse/models/house_model.dart';
+import 'package:renthouse/services/auth_service.dart';
 import 'package:renthouse/services/database_service.dart';
 import 'package:renthouse/utils/helpers.dart';
 import 'package:renthouse/widgets/custom_app_bar.dart';
@@ -21,6 +22,73 @@ class OrderDetailScreen extends StatefulWidget {
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final DatabaseService _databaseService = DatabaseService();
+  final AuthService _authService = AuthService();
+  HouseModel? _house;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchHouseDetails();
+  }
+
+  Future<void> _fetchHouseDetails() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final house = await _databaseService.getHouseById(widget.order.houseId);
+      setState(() {
+        _house = house;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _markAsRented() async {
+    if (_house == null) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      await FirebaseFirestore.instance
+          .collection(AppConstants.housesCollection)
+          .doc(widget.order.houseId)
+          .update({'status': AppConstants.propertyStatusRented});
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Property marked as rented successfully!'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+      
+      // Navigate back
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error marking property as rented: ${e.toString()}'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   Future<void> _updateOrderStatus(String status) async {
     try {
@@ -29,14 +97,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           .collection(AppConstants.ordersCollection)
           .doc(widget.order.orderId)
           .update({'status': status});
-
-      // If order is accepted, update property status to "Rented"
-      if (status == AppConstants.orderStatusAccepted) {
-        await FirebaseFirestore.instance
-            .collection(AppConstants.housesCollection)
-            .doc(widget.order.houseId)
-            .update({'status': AppConstants.propertyStatusRented});
-      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -191,29 +251,48 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           ),
                         ),
                         const SizedBox(height: 15),
-                        Row(
-                          children: [
-                            Expanded(
+                        Column(
+                        children: [
+                          // Show Accept/Reject buttons only if order is pending
+                          if (widget.order.status == AppConstants.orderStatusPending)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: CustomButton(
+                                    text: 'Accept',
+                                    onPressed: () {
+                                      _updateOrderStatus(AppConstants.orderStatusAccepted);
+                                    },
+                                    color: Colors.green,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: CustomButton(
+                                    text: 'Reject',
+                                    onPressed: () {
+                                      _updateOrderStatus(AppConstants.orderStatusRejected);
+                                    },
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          
+                          // Show "Mark as Rented" button only if order is accepted and property is available
+                          if (widget.order.status == AppConstants.orderStatusAccepted && 
+                              _house?.status == AppConstants.propertyStatusAvailable)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10),
                               child: CustomButton(
-                                text: 'Accept',
-                                onPressed: () {
-                                  _updateOrderStatus(AppConstants.orderStatusAccepted);
-                                },
-                                color: Colors.green,
+                                text: 'Mark as Rented',
+                                onPressed: _isLoading ? () {} : _markAsRented,
+                                color: Colors.orange,
+                                width: double.infinity,
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: CustomButton(
-                                text: 'Reject',
-                                onPressed: () {
-                                  _updateOrderStatus(AppConstants.orderStatusRejected);
-                                },
-                                color: Colors.red,
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
+                      ),
                       ],
                     );
                   }

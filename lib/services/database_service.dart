@@ -376,44 +376,59 @@ class DatabaseService {
 
   // ==================== CHAT METHODS ====================
 
-  // Create or get existing chat
-  Future<String> createOrGetChat(String tenantId, String landlordId, String? propertyId) async {
+  // Create or get existing chat with property context
+  Future<ChatModel> createOrGetChat({
+    required String tenantId,
+    required String landlordId,
+    required String propertyId,
+    required String propertyTitle,
+    required String propertyLocation,
+    required double propertyPrice,
+    required String propertyThumbnail,
+    required String otherUserName,
+  }) async {
     try {
+      // Generate unique chat ID
+      final chatId = ChatModel.generateChatId(tenantId, landlordId, propertyId);
+      
       // Check if chat already exists
       final existingChat = await _firestore
           .collection(AppConstants.chatsCollection)
-          .where('tenantId', isEqualTo: tenantId)
-          .where('landlordId', isEqualTo: landlordId)
-          .limit(1)
+          .doc(chatId)
           .get();
-
-      if (existingChat.docs.isNotEmpty) {
-        return existingChat.docs.first.id;
+      
+      if (existingChat.exists) {
+        return ChatModel.fromMap(existingChat.data()!);
       }
-
-      // Create new chat
-      final chatId = const Uuid().v4();
-      final chat = ChatModel(
+      
+      // Create new chat with property snapshot
+      final newChat = ChatModel(
         chatId: chatId,
         tenantId: tenantId,
         landlordId: landlordId,
         propertyId: propertyId,
+        propertyTitle: propertyTitle,
+        propertyLocation: propertyLocation,
+        propertyPrice: propertyPrice,
+        propertyThumbnail: propertyThumbnail,
+        otherUserId: landlordId,
+        otherUserName: otherUserName,
         createdAt: DateTime.now(),
         lastMessageAt: DateTime.now(),
       );
-
+      
       await _firestore
           .collection(AppConstants.chatsCollection)
           .doc(chatId)
-          .set(chat.toMap());
-
-      return chatId;
+          .set(newChat.toMap());
+      
+      return newChat;
     } catch (e) {
       rethrow;
     }
   }
 
-  // Get user chats
+  // Get user chats - Optimized with property context
   Stream<List<ChatModel>> getUserChats(String userId) {
     return _firestore
         .collection(AppConstants.chatsCollection)
@@ -443,6 +458,21 @@ class DatabaseService {
       return allChats;
     });
   }
+  
+  // Update chat with last message
+  Future<void> updateChatLastMessage(String chatId, String message) async {
+    try {
+      await _firestore
+          .collection(AppConstants.chatsCollection)
+          .doc(chatId)
+          .update({
+        'lastMessage': message,
+        'lastMessageAt': Timestamp.now(),
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
 
   // Get chat messages
   Stream<List<MessageModel>> getChatMessages(String chatId) {
@@ -458,7 +488,7 @@ class DatabaseService {
     });
   }
 
-  // Send message
+  // Send message - Updates chat last message
   Future<void> sendMessage(MessageModel message) async {
     try {
       await _firestore
@@ -466,12 +496,13 @@ class DatabaseService {
           .doc(message.messageId)
           .set(message.toMap());
 
-      // Update chat's last message time
+      // Update chat's last message time and preview
       await _firestore
           .collection(AppConstants.chatsCollection)
           .doc(message.chatId)
           .update({
         'lastMessageAt': Timestamp.fromDate(message.timestamp),
+        'lastMessage': message.content,
       });
     } catch (e) {
       rethrow;

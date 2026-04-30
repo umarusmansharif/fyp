@@ -49,6 +49,9 @@ dependencies:
   # URL launcher for WhatsApp integration
   url_launcher: ^6.3.1
   
+  # Share functionality
+  share_plus: ^7.2.1
+  
   # UUID for generating unique IDs
   uuid: ^4.5.1
   

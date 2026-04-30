@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum MessageType { text, image }
+enum MessageType { text, image, system } // Added system type
 
 class MessageModel {
   final String messageId;
@@ -49,6 +49,23 @@ class MessageModel {
         (e) => e.name == map['type'],
         orElse: () => MessageType.text,
       ),
+    );
+  }
+  
+  // Helper to create system messages
+  factory MessageModel.system({
+    required String messageId,
+    required String chatId,
+    required String content,
+    required DateTime timestamp,
+  }) {
+    return MessageModel(
+      messageId: messageId,
+      chatId: chatId,
+      senderId: 'system',
+      content: content,
+      timestamp: timestamp,
+      type: MessageType.system,
     );
   }
 }

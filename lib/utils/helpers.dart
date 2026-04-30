@@ -16,14 +16,42 @@ class Helpers {
 
   // Launch WhatsApp with pre-filled message
   static Future<void> launchWhatsApp(String phoneNumber, String message) async {
+    // Clean and format phone number
+    String cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
+    
+    // Remove leading zeros and add country code if not present
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '+92' + cleanPhone.substring(1);
+    } else if (!cleanPhone.startsWith('+')) {
+      cleanPhone = '+92' + cleanPhone;
+    }
+    
+    // Validate phone number
+    if (!_isValidWhatsAppNumber(cleanPhone)) {
+      throw 'Invalid phone number format';
+    }
+    
     final Uri whatsappUri = Uri.parse(
-        'https://wa.me/$phoneNumber?text=${Uri.encodeComponent(message)}');
+        'https://wa.me/${cleanPhone.substring(1)}?text=${Uri.encodeComponent(message)}');
     
     if (await canLaunchUrl(whatsappUri)) {
       await launchUrl(whatsappUri);
     } else {
-      throw 'Could not launch WhatsApp';
+      throw 'Could not launch WhatsApp. Please make sure WhatsApp is installed.';
     }
+  }
+  
+  // Validate WhatsApp number format
+  static bool _isValidWhatsAppNumber(String phoneNumber) {
+    // Remove + sign for validation
+    String cleanPhone = phoneNumber.replaceAll('+', '');
+    
+    // Check if it's a valid Pakistani number (92 followed by 9-10 digits)
+    if (cleanPhone.startsWith('92') && cleanPhone.length >= 11 && cleanPhone.length <= 12) {
+      return RegExp(r'^92[0-9]{9,10}$').hasMatch(cleanPhone);
+    }
+    
+    return false;
   }
 
   // Validate email

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:renthouse/core/constants.dart';
-import 'package:renthouse/models/chat_model.dart';
 import 'package:renthouse/models/house_model.dart';
 import 'package:renthouse/models/user_model.dart';
 import 'package:renthouse/models/order_model.dart';
@@ -13,7 +13,6 @@ import 'package:renthouse/services/database_service.dart';
 import 'package:renthouse/utils/helpers.dart';
 import 'package:renthouse/widgets/custom_button.dart';
 import 'package:renthouse/widgets/image_carousel.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 
 class HouseDetailScreen extends StatefulWidget {
@@ -94,25 +93,21 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
     }
 
     try {
-      final chatId = await _databaseService.createOrGetChat(
-        currentUser.uid,
-        widget.house.landlordId,
-        widget.house.houseId,
-      );
-
       final landlord = await _databaseService.getUser(widget.house.landlordId);
       if (landlord == null || !mounted) return;
 
-      final chatDoc = await FirebaseFirestore.instance
-          .collection(AppConstants.chatsCollection)
-          .doc(chatId)
-          .get();
+      final chat = await _databaseService.createOrGetChat(
+        tenantId: currentUser.uid,
+        landlordId: widget.house.landlordId,
+        propertyId: widget.house.houseId,
+        propertyTitle: widget.house.title,
+        propertyLocation: widget.house.location,
+        propertyPrice: widget.house.price,
+        propertyThumbnail: widget.house.images.isNotEmpty ? widget.house.images.first : widget.house.imageUrl,
+        otherUserName: landlord.name,
+      );
 
-      if (!chatDoc.exists || !mounted) return;
-
-      final chatData = chatDoc.data()!;
-      final chat = ChatModel.fromMap(chatData);
-
+      if (!mounted) return;
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -188,15 +183,97 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
       // Get landlord details
       final landlord = await _databaseService.getUser(widget.house.landlordId);
       if (landlord == null) {
-        throw 'Landlord not found';
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Landlord information not available'),
+            backgroundColor: Color(0xFFF59E0B),
+          ),
+        );
+        return;
       }
 
-      final message = 'I am interested in your house listing.';
+      // Check if phone number is available
+      if (landlord.phone.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Landlord has not provided a phone number'),
+            backgroundColor: Color(0xFFF59E0B),
+          ),
+        );
+        return;
+      }
+
+      final message = 'I am interested in your house listing: ${widget.house.title}.';
       await Helpers.launchWhatsApp(landlord.phone, message);
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Opening WhatsApp...'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      
+      String errorMessage = 'Error contacting landlord';
+      if (e.toString().contains('Invalid phone number')) {
+        errorMessage = 'Invalid phone number provided by landlord';
+      } else if (e.toString().contains('Could not launch WhatsApp')) {
+        errorMessage = 'WhatsApp is not installed or not available';
+      } else if (e.toString().contains('Landlord not found')) {
+        errorMessage = 'Landlord information not available';
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
+  }
+
+  Future<void> _shareProperty() async {
+    try {
+      // Prepare share content
+      final String title = widget.house.title;
+      final String price = Helpers.formatCurrency(widget.house.price);
+      final String location = widget.house.location;
+      final String description = widget.house.description;
+      
+      // Build share text
+      String shareText = 'Check out this property for rent!\n\n';
+      shareText += 'Title: $title\n';
+      shareText += 'Price: $price\n';
+      shareText += 'Location: $location\n';
+      shareText += 'Type: ${widget.house.houseType}\n';
+      shareText += 'Area: ${widget.house.area} Marla\n';
+      shareText += 'Rooms: ${widget.house.numberOfRooms}\n\n';
+      shareText += 'Description:\n$description\n\n';
+      
+      // Add amenities if available
+      if (widget.house.amenities.isNotEmpty) {
+        shareText += 'Amenities:\n';
+        for (String amenity in widget.house.amenities) {
+          shareText += 'â¢ $amenity\n';
+        }
+        shareText += '\n';
+      }
+      
+      shareText += 'Shared via RentHouse App';
+      
+      // Share the content
+      await Share.share(
+        shareText,
+        subject: 'Property for Rent: $title',
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
+        SnackBar(content: Text('Error sharing property: ${e.toString()}')),
       );
     }
   }
@@ -224,12 +301,7 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.share, color: Colors.black),
-            onPressed: () {
-              // TODO: Implement share functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Share feature coming soon!')),
-              );
-            },
+            onPressed: _shareProperty,
           ),
         ],
       ),
@@ -340,10 +412,10 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: widget.house.status == 'available'
-                              ? Colors.green.withOpacity(0.1)
+                              ? Colors.green.withValues(alpha: 0.1)
                               : widget.house.status == 'rented'
-                                  ? Colors.orange.withOpacity(0.1)
-                                  : Colors.red.withOpacity(0.1),
+                                  ? Colors.orange.withValues(alpha: 0.1)
+                                  : Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: widget.house.status == 'available'
@@ -388,7 +460,7 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
                             amenity,
                             style: const TextStyle(fontSize: 12),
                           ),
-                          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                          backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                           side: BorderSide(color: Theme.of(context).primaryColor),
                         );
                       }).toList(),

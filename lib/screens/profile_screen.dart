@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:renthouse/core/constants.dart';
@@ -8,6 +9,7 @@ import 'package:renthouse/screens/house_detail_screen.dart';
 import 'package:renthouse/screens/order_detail_screen.dart';
 import 'package:renthouse/screens/edit_house_screen.dart';
 import 'package:renthouse/services/database_service.dart';
+import 'package:renthouse/services/cloudinary_service.dart';
 import 'package:renthouse/utils/helpers.dart';
 import 'package:renthouse/widgets/custom_app_bar.dart';
 import 'package:renthouse/widgets/house_card.dart';
@@ -36,26 +38,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     if (image == null) return;
     
+    if (widget.user == null) return;
+    
     setState(() {
       _isUploadingImage = true;
     });
     
     try {
-      // TODO: Implement image upload to Cloudinary or Firebase Storage
-      // For now, we'll just show a message
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile image upload requires cloud storage setup'),
-          backgroundColor: Color(0xFFF59E0B),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // Upload image to Cloudinary using the same service as property images
+      File imageFile = File(image.path);
+      String? imageUrl = await CloudinaryService.uploadImageToCloudinary(imageFile);
+      
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        // Update user profile in database
+        await _databaseService.updateUserProfileImage(widget.user!.uid, imageUrl);
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile image updated successfully'),
+            backgroundColor: Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        throw Exception('Failed to upload image to cloud storage');
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString()}'),
+          content: Text('Error uploading profile image: ${e.toString()}'),
           backgroundColor: const Color(0xFFEF4444),
           behavior: SnackBarBehavior.floating,
         ),

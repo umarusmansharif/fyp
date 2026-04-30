@@ -254,11 +254,11 @@ class _LocationPickerState extends State<LocationPicker> {
                   },
                 ),
 
-          // Search Bar at top
+          // Search bar at top
           Positioned(
             top: 16,
             left: 16,
-            right: 80,
+            right: 16,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -352,13 +352,12 @@ class _LocationPickerState extends State<LocationPicker> {
             ),
           ),
 
-          // Instructions at top
+          // Instructions at bottom-right
           Positioned(
-            top: 16,
-            left: 16,
+            bottom: 160,
             right: 16,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -371,18 +370,18 @@ class _LocationPickerState extends State<LocationPicker> {
                 ],
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     Icons.info_outline,
-                    size: 18,
+                    size: 16,
                     color: Theme.of(context).primaryColor,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   const Text(
-                    'Tap on map or drag marker to select location',
+                    'Tap & Drag',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
