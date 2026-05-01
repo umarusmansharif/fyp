@@ -394,7 +394,7 @@ class DatabaseService {
 
   // ==================== CHAT METHODS ====================
 
-  // Create or get existing chat with property context
+  // Create or get chat between tenant and landlord for a property
   Future<ChatModel> createOrGetChat({
     required String tenantId,
     required String landlordId,
@@ -406,7 +406,6 @@ class DatabaseService {
     required String otherUserName,
   }) async {
     try {
-      // Generate unique chat ID
       final chatId = ChatModel.generateChatId(tenantId, landlordId, propertyId);
       
       // Check if chat already exists
@@ -416,7 +415,18 @@ class DatabaseService {
           .get();
       
       if (existingChat.exists) {
-        return ChatModel.fromMap(existingChat.data()!);
+        final chatData = existingChat.data()!;
+        // Check if current user (tenant) has deleted this chat
+        final deletedByTenant = chatData['deletedByTenant'] ?? false;
+        if (deletedByTenant) {
+          // Chat was deleted by tenant, create a new one with timestamp
+          return await _createNewChatWithTimestamp(
+            tenantId, landlordId, propertyId,
+            propertyTitle, propertyLocation, propertyPrice,
+            propertyThumbnail, otherUserName,
+          );
+        }
+        return ChatModel.fromMap(chatData);
       }
       
       // Create new chat with property snapshot
@@ -458,13 +468,82 @@ class DatabaseService {
     }
   }
 
-  // Delete chat for current user (soft delete by setting isActive to false)
+  // Create new chat with timestamp-based ID (for re-chat after delete)
+  Future<ChatModel> _createNewChatWithTimestamp(
+    String tenantId,
+    String landlordId,
+    String propertyId,
+    String propertyTitle,
+    String propertyLocation,
+    double propertyPrice,
+    String propertyThumbnail,
+    String otherUserName,
+  ) async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final newChatId = '${tenantId}_${landlordId}_$propertyId$timestamp';
+    
+    final newChat = ChatModel(
+      chatId: newChatId,
+      tenantId: tenantId,
+      landlordId: landlordId,
+      propertyId: propertyId,
+      propertyTitle: propertyTitle,
+      propertyLocation: propertyLocation,
+      propertyPrice: propertyPrice,
+      propertyThumbnail: propertyThumbnail,
+      otherUserId: landlordId,
+      otherUserName: otherUserName,
+      createdAt: DateTime.now(),
+      lastMessageAt: DateTime.now(),
+    );
+    
+    await _firestore
+        .collection(AppConstants.chatsCollection)
+        .doc(newChatId)
+        .set(newChat.toMap());
+    
+    // Auto-send property reference message from tenant
+    final propertyMessage = MessageModel(
+      messageId: const Uuid().v4(),
+      chatId: newChatId,
+      senderId: tenantId,
+      content: 'Hi, I\'m interested in this property and would like to discuss further.\n\nProperty: $propertyTitle\nLocation: $propertyLocation\nPrice: ${Helpers.formatCurrency(propertyPrice)}',
+      timestamp: DateTime.now(),
+      type: MessageType.text,
+    );
+    
+    await sendMessage(propertyMessage);
+    
+    return newChat;
+  }
+
+  // Delete chat for current user (per-user delete)
   Future<void> deleteChat(String chatId, String userId) async {
     try {
-      await _firestore
+      // Get chat to determine user role
+      final chatDoc = await _firestore
           .collection(AppConstants.chatsCollection)
           .doc(chatId)
-          .update({'isActive': false});
+          .get();
+      
+      if (!chatDoc.exists) return;
+      
+      final chatData = chatDoc.data()!;
+      final tenantId = chatData['tenantId'] as String;
+      final landlordId = chatData['landlordId'] as String;
+      
+      // Set appropriate delete flag based on user role
+      if (userId == tenantId) {
+        await _firestore
+            .collection(AppConstants.chatsCollection)
+            .doc(chatId)
+            .update({'deletedByTenant': true});
+      } else if (userId == landlordId) {
+        await _firestore
+            .collection(AppConstants.chatsCollection)
+            .doc(chatId)
+            .update({'deletedByLandlord': true});
+      }
     } catch (e) {
       rethrow;
     }
@@ -530,7 +609,7 @@ class DatabaseService {
     });
   }
 
-  // Send message - Updates chat last message
+  // Send message - Updates chat last message and unread count
   Future<void> sendMessage(MessageModel message) async {
     try {
       await _firestore
@@ -538,14 +617,39 @@ class DatabaseService {
           .doc(message.messageId)
           .set(message.toMap());
 
-      // Update chat's last message time and preview
-      await _firestore
+      // Get chat to determine recipient
+      final chatDoc = await _firestore
           .collection(AppConstants.chatsCollection)
           .doc(message.chatId)
-          .update({
-        'lastMessageAt': Timestamp.fromDate(message.timestamp),
-        'lastMessage': message.content,
-      });
+          .get();
+      
+      if (chatDoc.exists) {
+        final chatData = chatDoc.data()!;
+        final tenantId = chatData['tenantId'] as String;
+        final landlordId = chatData['landlordId'] as String;
+        
+        // Determine recipient (the other user)
+        final recipientId = message.senderId == tenantId ? landlordId : tenantId;
+        
+        // Increment unread count for recipient only
+        await _firestore
+            .collection(AppConstants.chatsCollection)
+            .doc(message.chatId)
+            .update({
+          'lastMessageAt': Timestamp.fromDate(message.timestamp),
+          'lastMessage': message.content,
+          'unreadCount': FieldValue.increment(1),
+        });
+      } else {
+        // Fallback if chat doesn't exist
+        await _firestore
+            .collection(AppConstants.chatsCollection)
+            .doc(message.chatId)
+            .update({
+          'lastMessageAt': Timestamp.fromDate(message.timestamp),
+          'lastMessage': message.content,
+        });
+      }
     } catch (e) {
       rethrow;
     }

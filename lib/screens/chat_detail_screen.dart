@@ -33,11 +33,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isSending = false;
+  UserModel? _refreshedOtherUser;
 
   @override
   void initState() {
     super.initState();
+    _refreshedOtherUser = widget.otherUser;
     _markMessagesAsRead();
+    _refreshOtherUserData();
   }
 
   @override
@@ -45,6 +48,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshOtherUserData() async {
+    // Fetch fresh data for other user to get latest profile image
+    final freshData = await _databaseService.getUser(widget.otherUser.uid);
+    if (freshData != null && mounted) {
+      setState(() {
+        _refreshedOtherUser = freshData;
+      });
+    }
   }
 
   Future<void> _markMessagesAsRead() async {
@@ -78,6 +91,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
       await _databaseService.sendMessage(message);
       _messageController.clear();
+
+      // Reset unread count for current user when they send a reply
+      await _databaseService.markAllMessagesAsRead(widget.chat.chatId, userId);
 
       // Scroll to bottom
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -140,13 +156,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundImage: widget.otherUser.profileImage != null &&
-                      widget.otherUser.profileImage!.isNotEmpty
-                  ? NetworkImage(widget.otherUser.profileImage!) as ImageProvider
+              backgroundImage: _refreshedOtherUser?.profileImage != null &&
+                      _refreshedOtherUser!.profileImage!.isNotEmpty
+                  ? NetworkImage(_refreshedOtherUser!.profileImage!) as ImageProvider
                   : const AssetImage(AppConstants.defaultProfileImage),
               backgroundColor: Colors.grey[200],
-              child: widget.otherUser.profileImage == null ||
-                      widget.otherUser.profileImage!.isEmpty
+              child: _refreshedOtherUser?.profileImage == null ||
+                      _refreshedOtherUser!.profileImage!.isEmpty
                   ? Icon(Icons.person, size: 18, color: Colors.grey[500])
                   : null,
             ),

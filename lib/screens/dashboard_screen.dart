@@ -22,7 +22,7 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   UserModel? _currentUser;
@@ -34,12 +34,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadUserData();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh user data when app comes to foreground
+      _loadUserData();
+    }
   }
 
   Future<void> _loadUserData() async {
     final user = _authService.getCurrentUser();
     if (user != null) {
+      // Always fetch fresh data from Firestore to get latest profile image
       final userData = await _databaseService.getUser(user.uid);
       setState(() {
         _currentUser = userData;
@@ -140,13 +156,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         leading: GestureDetector(
-          onTap: () {
-            Navigator.push(
+          onTap: () async {
+            final result = await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => ProfileScreen(user: _currentUser),
               ),
             );
+            // If profile was updated, refresh user data
+            if (result == true && mounted) {
+              _loadUserData();
+            }
           },
           child: Container(
             margin: const EdgeInsets.all(8),

@@ -16,6 +16,8 @@ class ChatModel {
   final DateTime lastMessageAt;
   final int unreadCount;
   final bool isActive; // Chat active status
+  final bool deletedByTenant; // Per-user delete flag
+  final bool deletedByLandlord; // Per-user delete flag
 
   ChatModel({
     required this.chatId,
@@ -33,6 +35,8 @@ class ChatModel {
     required this.lastMessageAt,
     this.unreadCount = 0,
     this.isActive = true,
+    this.deletedByTenant = false,
+    this.deletedByLandlord = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -52,6 +56,8 @@ class ChatModel {
       'lastMessageAt': Timestamp.fromDate(lastMessageAt),
       'unreadCount': unreadCount,
       'isActive': isActive,
+      'deletedByTenant': deletedByTenant,
+      'deletedByLandlord': deletedByLandlord,
     };
   }
 
@@ -72,6 +78,8 @@ class ChatModel {
       lastMessageAt: (map['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       unreadCount: map['unreadCount'] ?? 0,
       isActive: map['isActive'] ?? true,
+      deletedByTenant: map['deletedByTenant'] ?? false,
+      deletedByLandlord: map['deletedByLandlord'] ?? false,
     );
   }
   

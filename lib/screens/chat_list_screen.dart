@@ -15,9 +15,44 @@ class ChatListScreen extends StatefulWidget {
   State<ChatListScreen> createState() => _ChatListScreenState();
 }
 
-class _ChatListScreenState extends State<ChatListScreen> {
+class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObserver {
   final DatabaseService _databaseService = DatabaseService();
   final AuthService _authService = AuthService();
+  UserModel? _currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _currentUser = widget.currentUser;
+    _refreshCurrentUser();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh current user data when app comes to foreground
+      _refreshCurrentUser();
+    }
+  }
+
+  Future<void> _refreshCurrentUser() async {
+    final user = _authService.getCurrentUser();
+    if (user != null) {
+      final freshData = await _databaseService.getUser(user.uid);
+      if (freshData != null && mounted) {
+        setState(() {
+          _currentUser = freshData;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,9 +132,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
           }
 
           final chats = snapshot.data!;
-          
-          // Filter out deleted chats (isActive = false)
-          final activeChats = chats.where((chat) => chat.isActive).toList();
+
+          // Filter out deleted chats at UI level
+          final activeChats = chats.where((chat) {
+            if (chat.tenantId == userId) {
+              return !chat.deletedByTenant;
+            } else {
+              return !chat.deletedByLandlord;
+            }
+          }).toList();
 
           return ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8),

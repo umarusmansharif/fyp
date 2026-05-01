@@ -24,11 +24,30 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
   final _reviewController = TextEditingController();
   double _rating = 0;
   bool _isSubmitting = false;
+  UserModel? _refreshedCurrentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshedCurrentUser = widget.currentUser;
+    _refreshCurrentUserData();
+  }
 
   @override
   void dispose() {
     _reviewController.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshCurrentUserData() async {
+    if (widget.currentUser != null) {
+      final freshData = await _databaseService.getUser(widget.currentUser!.uid);
+      if (freshData != null && mounted) {
+        setState(() {
+          _refreshedCurrentUser = freshData;
+        });
+      }
+    }
   }
 
   String _getUserNameInitial(String? userName) {
@@ -67,8 +86,8 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
         reviewId: '', // Will be set by database service
         propertyId: widget.house.houseId,
         userId: userId,
-        userName: widget.currentUser?.name ?? 'Anonymous',
-        userAvatar: widget.currentUser?.profileImage,
+        userName: _refreshedCurrentUser?.name ?? 'Anonymous',
+        userAvatar: _refreshedCurrentUser?.profileImage,
         rating: _rating.round(),
         comment: _reviewController.text.trim(),
         createdAt: DateTime.now(),

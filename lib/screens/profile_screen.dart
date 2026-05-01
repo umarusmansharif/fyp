@@ -27,13 +27,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final DatabaseService _databaseService = DatabaseService();
   UserModel? _currentUser;
   bool _isUploadingImage = false;
-  int _imageTimestamp = 0;
+  bool _profileUpdated = false;
   
   @override
   void initState() {
     super.initState();
     _currentUser = widget.user;
-    _imageTimestamp = 0;
     // Fetch fresh user data to ensure latest profile image
     if (widget.user != null) {
       _fetchFreshUserData();
@@ -85,7 +84,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (updatedUser != null && mounted) {
           setState(() {
             _currentUser = updatedUser;
-            _imageTimestamp = DateTime.now().millisecondsSinceEpoch;
+            _profileUpdated = true;
           });
         }
         
@@ -124,7 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: CustomAppBar(
         title: 'Profile',
         onBackPress: () {
-          Navigator.pop(context);
+          Navigator.pop(context, _profileUpdated);
         },
       ),
       body: SingleChildScrollView(
@@ -142,9 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         CircleAvatar(
                           radius: 50,
                           backgroundImage: _currentUser?.profileImage != null && _currentUser!.profileImage!.isNotEmpty
-                              ? NetworkImage(_imageTimestamp > 0 
-                                  ? '${_currentUser!.profileImage}?t=$_imageTimestamp' 
-                                  : _currentUser!.profileImage!)
+                              ? NetworkImage(_currentUser!.profileImage!)
                               : null,
                           backgroundColor: Colors.grey[200],
                           child: _currentUser?.profileImage == null || _currentUser!.profileImage!.isEmpty
