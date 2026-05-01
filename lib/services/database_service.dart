@@ -9,6 +9,7 @@ import 'package:renthouse/models/favorite_model.dart';
 import 'package:renthouse/models/review_model.dart';
 import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/services/cloudinary_service.dart';
+import 'package:renthouse/utils/helpers.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseService {
@@ -30,14 +31,19 @@ class DatabaseService {
   }
 
   // Get all houses
-  Stream<List<HouseModel>> getHouses() {
-    return _firestore
+  Stream<List<HouseModel>> getHouses({String? userId, String? userType}) {
+    Query query = _firestore
         .collection(AppConstants.housesCollection)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
+        .orderBy('createdAt', descending: true);
+    
+    // Filter out rented properties for tenants at query level
+    if (userType == AppConstants.userTypeTenant) {
+      query = query.where('status', isEqualTo: AppConstants.propertyStatusAvailable);
+    }
+    
+    return query.snapshots().map((snapshot) {
       return snapshot.docs
-          .map((doc) => HouseModel.fromMap(doc.data()))
+          .map((doc) => HouseModel.fromMap(doc.data() as Map<String, dynamic>))
           .toList();
     });
   }
@@ -222,6 +228,18 @@ class DatabaseService {
           .collection(AppConstants.usersCollection)
           .doc(userId)
           .update({'profileImage': profileImageUrl});
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Update house status
+  Future<void> updateHouseStatus(String houseId, String status) async {
+    try {
+      await _firestore
+          .collection(AppConstants.housesCollection)
+          .doc(houseId)
+          .update({'status': status});
     } catch (e) {
       rethrow;
     }
@@ -422,7 +440,31 @@ class DatabaseService {
           .doc(chatId)
           .set(newChat.toMap());
       
+      // Auto-send property reference message from tenant
+      final propertyMessage = MessageModel(
+        messageId: const Uuid().v4(),
+        chatId: chatId,
+        senderId: tenantId,
+        content: 'Hi, I\'m interested in this property and would like to discuss further.\n\nProperty: $propertyTitle\nLocation: $propertyLocation\nPrice: ${Helpers.formatCurrency(propertyPrice)}',
+        timestamp: DateTime.now(),
+        type: MessageType.text,
+      );
+      
+      await sendMessage(propertyMessage);
+      
       return newChat;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Delete chat for current user (soft delete by setting isActive to false)
+  Future<void> deleteChat(String chatId, String userId) async {
+    try {
+      await _firestore
+          .collection(AppConstants.chatsCollection)
+          .doc(chatId)
+          .update({'isActive': false});
     } catch (e) {
       rethrow;
     }
@@ -535,7 +577,7 @@ class DatabaseService {
         await doc.reference.update({'isRead': true});
       }
 
-      // Reset unread count in chat
+      // Reset unread count in chat document
       await _firestore
           .collection(AppConstants.chatsCollection)
           .doc(chatId)

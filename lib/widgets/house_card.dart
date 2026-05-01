@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/models/house_model.dart';
 import 'package:renthouse/services/auth_service.dart';
 import 'package:renthouse/services/database_service.dart';
@@ -22,6 +23,7 @@ class _HouseCardState extends State<HouseCard> {
   final AuthService _authService = AuthService();
   bool _isFavorite = false;
   bool _isLoading = false;
+  bool _isMarkingRented = false;
 
   @override
   void initState() {
@@ -78,6 +80,46 @@ class _HouseCardState extends State<HouseCard> {
         });
       }
     }
+  }
+
+  Future<void> _markAsRented() async {
+    final userId = _authService.getCurrentUser()?.uid;
+    if (userId == null) return;
+
+    setState(() {
+      _isMarkingRented = true;
+    });
+
+    try {
+      await _databaseService.updateHouseStatus(widget.house.houseId, AppConstants.propertyStatusRented);
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Property marked as rented successfully'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error marking property as rented: ${e.toString()}'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isMarkingRented = false;
+        });
+      }
+    }
+  }
+
+  bool _isPropertyOwner() {
+    final userId = _authService.getCurrentUser()?.uid;
+    return userId != null && userId == widget.house.landlordId;
   }
 
   @override
@@ -184,6 +226,43 @@ class _HouseCardState extends State<HouseCard> {
                         color: Colors.white,
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              // Mark as Rented button for property owners
+              if (_isPropertyOwner() && widget.house.status == AppConstants.propertyStatusAvailable)
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  right: 60,
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: GestureDetector(
+                      onTap: _isMarkingRented ? null : _markAsRented,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: _isMarkingRented
+                            ? const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Text(
+                                'Mark Rented',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                   ),

@@ -291,7 +291,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               SizedBox(
                 height: 220,
                 child: StreamBuilder<List<HouseModel>>(
-                  stream: _databaseService.getHouses(),
+                  stream: _databaseService.getHouses(
+                    userId: _currentUser?.uid,
+                    userType: _currentUser?.userType,
+                  ),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(
@@ -355,17 +358,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         );
                         return distanceA.compareTo(distanceB);
                       });
-                      
-                      // Filter houses within 50km radius
-                      sortedHouses = sortedHouses.where((house) {
-                        double distance = _calculateDistance(
-                          _userPosition!.latitude,
-                          _userPosition!.longitude,
-                          house.latitude,
-                          house.longitude,
-                        );
-                        return distance <= 50; // 50 km radius
-                      }).toList();
                     }
 
                     // Show first few houses in the main gallery
@@ -396,13 +388,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               Icon(Icons.home_work, size: 48, color: Colors.grey),
                               SizedBox(height: 16),
                               Text(
-                                'No properties found within 50km',
+                                'No properties available',
                                 style: TextStyle(color: Colors.grey),
                                 textAlign: TextAlign.center,
                               ),
                               SizedBox(height: 8),
                               Text(
-                                'Properties with valid location will appear here',
+                                'Properties will be shown sorted by distance',
                                 style: TextStyle(color: Colors.grey, fontSize: 12),
                                 textAlign: TextAlign.center,
                               ),
@@ -455,7 +447,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               SizedBox(
                 height: 220,
                 child: StreamBuilder<List<HouseModel>>(
-                  stream: _databaseService.getHouses(),
+                  stream: _databaseService.getHouses(
+                    userId: _currentUser?.uid,
+                    userType: _currentUser?.userType,
+                  ),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(

@@ -97,12 +97,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
           }
 
           final chats = snapshot.data!;
+          
+          // Filter out deleted chats (isActive = false)
+          final activeChats = chats.where((chat) => chat.isActive).toList();
 
           return ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: chats.length,
+            itemCount: activeChats.length,
             itemBuilder: (context, index) {
-              final chat = chats[index];
+              final chat = activeChats[index];
               final otherUserId = chat.tenantId == userId
                   ? chat.landlordId
                   : chat.tenantId;
@@ -204,6 +207,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             ),
                           );
                         },
+                        onLongPress: () {
+                          _showDeleteDialog(chat, otherUser.name);
+                        },
                       );
                     },
                   );
@@ -222,5 +228,48 @@ class _ChatListScreenState extends State<ChatListScreen> {
           .where((msg) => msg.senderId != userId && !msg.isRead)
           .length;
     });
+  }
+
+  void _showDeleteDialog(ChatModel chat, String userName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Chat'),
+        content: Text('Are you sure you want to delete the chat with $userName?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final userId = _authService.getCurrentUser()?.uid;
+              if (userId != null) {
+                try {
+                  await _databaseService.deleteChat(chat.chatId, userId);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Chat deleted successfully'),
+                      backgroundColor: Color(0xFF10B981),
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting chat: ${e.toString()}'),
+                      backgroundColor: const Color(0xFFEF4444),
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
+          ),
+        ],
+      ),
+    );
   }
 }

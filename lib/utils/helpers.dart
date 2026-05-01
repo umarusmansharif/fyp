@@ -16,29 +16,25 @@ class Helpers {
 
   // Launch WhatsApp with pre-filled message
   static Future<void> launchWhatsApp(String phoneNumber, String message) async {
-    // Clean and format phone number
-    String cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
+    // Clean phone number - remove all non-numeric characters
+    String cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
     
-    // Remove leading zeros and add country code if not present
-    if (cleanPhone.startsWith('0')) {
-      cleanPhone = '+92' + cleanPhone.substring(1);
-    } else if (!cleanPhone.startsWith('+')) {
-      cleanPhone = '+92' + cleanPhone;
+    // Convert 11-digit format (03XXXXXXXXX) to international format (923XXXXXXXXX)
+    if (cleanPhone.startsWith('0') && cleanPhone.length == 11) {
+      cleanPhone = '92' + cleanPhone.substring(1);
     }
     
-    // Validate phone number
-    if (!_isValidWhatsAppNumber(cleanPhone)) {
-      throw 'Invalid phone number format';
+    // Validate phone number (should be 12 digits starting with 92)
+    if (cleanPhone.length != 12 || !cleanPhone.startsWith('92')) {
+      throw 'Invalid phone number format. Expected 11 digits starting with 0';
     }
     
+    // Create WhatsApp URL (format: https://wa.me/923XXXXXXXXX)
     final Uri whatsappUri = Uri.parse(
-        'https://wa.me/${cleanPhone.substring(1)}?text=${Uri.encodeComponent(message)}');
+        'https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}');
     
-    if (await canLaunchUrl(whatsappUri)) {
-      await launchUrl(whatsappUri);
-    } else {
-      throw 'Could not launch WhatsApp. Please make sure WhatsApp is installed.';
-    }
+    // Launch directly without canLaunchUrl check to avoid false negatives
+    await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
   }
   
   // Validate WhatsApp number format

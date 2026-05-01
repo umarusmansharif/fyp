@@ -25,7 +25,34 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final DatabaseService _databaseService = DatabaseService();
+  UserModel? _currentUser;
   bool _isUploadingImage = false;
+  int _imageTimestamp = 0;
+  
+  @override
+  void initState() {
+    super.initState();
+    _currentUser = widget.user;
+    _imageTimestamp = 0;
+    // Fetch fresh user data to ensure latest profile image
+    if (widget.user != null) {
+      _fetchFreshUserData();
+    }
+  }
+
+  Future<void> _fetchFreshUserData() async {
+    try {
+      final freshUser = await _databaseService.getUser(widget.user!.uid);
+      if (freshUser != null && mounted) {
+        setState(() {
+          _currentUser = freshUser;
+        });
+      }
+    } catch (e) {
+      // If fetch fails, keep using widget.user as fallback
+      print('Error fetching fresh user data: $e');
+    }
+  }
   
   Future<void> _uploadProfileImage() async {
     final ImagePicker picker = ImagePicker();
@@ -52,6 +79,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (imageUrl != null && imageUrl.isNotEmpty) {
         // Update user profile in database
         await _databaseService.updateUserProfileImage(widget.user!.uid, imageUrl);
+        
+        // Fetch updated user data to refresh UI immediately
+        final updatedUser = await _databaseService.getUser(widget.user!.uid);
+        if (updatedUser != null && mounted) {
+          setState(() {
+            _currentUser = updatedUser;
+            _imageTimestamp = DateTime.now().millisecondsSinceEpoch;
+          });
+        }
         
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -105,11 +141,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         CircleAvatar(
                           radius: 50,
-                          backgroundImage: widget.user?.profileImage != null && widget.user!.profileImage!.isNotEmpty
-                              ? NetworkImage(widget.user!.profileImage!)
+                          backgroundImage: _currentUser?.profileImage != null && _currentUser!.profileImage!.isNotEmpty
+                              ? NetworkImage(_imageTimestamp > 0 
+                                  ? '${_currentUser!.profileImage}?t=$_imageTimestamp' 
+                                  : _currentUser!.profileImage!)
                               : null,
                           backgroundColor: Colors.grey[200],
-                          child: widget.user?.profileImage == null || widget.user!.profileImage!.isEmpty
+                          child: _currentUser?.profileImage == null || _currentUser!.profileImage!.isEmpty
                               ? Icon(Icons.person, size: 50, color: Colors.grey[500])
                               : null,
                         ),
@@ -146,7 +184,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 15),
                     Text(
-                      widget.user?.name ?? 'User',
+                      _currentUser?.name ?? 'User',
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -154,7 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      widget.user?.email ?? '',
+                      _currentUser?.email ?? '',
                       style: const TextStyle(
                         fontSize: 16,
                         color: Colors.grey,
@@ -162,7 +200,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      widget.user?.userType == AppConstants.userTypeTenant
+                      _currentUser?.userType == AppConstants.userTypeTenant
                           ? 'Tenant'
                           : 'Landlord',
                       style: const TextStyle(
@@ -172,7 +210,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      'Member since ${Helpers.formatDate(widget.user?.createdAt ?? DateTime.now())}',
+                      'Member since ${Helpers.formatDate(_currentUser?.createdAt ?? DateTime.now())}',
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
@@ -191,18 +229,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 15),
-              _buildInfoCard('Phone', widget.user?.phone ?? ''),
+              _buildInfoCard('Phone', _currentUser?.phone ?? ''),
               const SizedBox(height: 15),
-              _buildInfoCard('Email', widget.user?.email ?? ''),
+              _buildInfoCard('Email', _currentUser?.email ?? ''),
               const SizedBox(height: 15),
               _buildInfoCard(
                   'User Type',
-                  widget.user?.userType == AppConstants.userTypeTenant
+                  _currentUser?.userType == AppConstants.userTypeTenant
                       ? 'Tenant'
                       : 'Landlord'),
               const SizedBox(height: 30),
               // Conditional content based on user type
-              if (widget.user?.userType == AppConstants.userTypeLandlord) ...[
+              if (_currentUser?.userType == AppConstants.userTypeLandlord) ...[
                 const Text(
                   'My Listings',
                   style: TextStyle(
@@ -212,7 +250,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 15),
                 StreamBuilder<List<HouseModel>>(
-                  stream: _databaseService.getHousesByLandlord(widget.user!.uid),
+                  stream: _databaseService.getHousesByLandlord(_currentUser!.uid),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
@@ -291,7 +329,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 15),
                 StreamBuilder<List<OrderModel>>(
-                  stream: _databaseService.getOrdersForLandlord(widget.user!.uid),
+                  stream: _databaseService.getOrdersForLandlord(_currentUser!.uid),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());

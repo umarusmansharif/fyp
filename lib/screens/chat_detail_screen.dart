@@ -163,13 +163,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (widget.chat.propertyTitle.isNotEmpty)
+                    Text(
+                      widget.chat.propertyTitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
+                    overflow: TextOverflow.ellipsis,
+                    ),
                   Text(
                     widget.otherUser.userType == AppConstants.userTypeTenant
                         ? 'Tenant'
                         : 'Landlord',
                     style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white70,
+                      fontSize: 11,
+                      color: Colors.white54,
                     ),
                   ),
                 ],
