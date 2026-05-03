@@ -89,7 +89,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         type: imageUrl != null ? MessageType.image : MessageType.text,
       );
 
-      await _databaseService.sendMessage(message);
+      await _databaseService.sendMessage(message, currentActiveChatId: widget.chat.chatId);
       _messageController.clear();
 
       // Reset unread count for current user when they send a reply
@@ -179,15 +179,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (widget.chat.propertyTitle.isNotEmpty)
-                    Text(
-                      widget.chat.propertyTitle,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white70,
-                      ),
-                    overflow: TextOverflow.ellipsis,
-                    ),
                   Text(
                     widget.otherUser.userType == AppConstants.userTypeTenant
                         ? 'Tenant'
@@ -430,9 +421,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     if (isMe) ...[
                       const SizedBox(width: 4),
                       Icon(
-                        message.isRead ? Icons.done_all : Icons.done,
+                        message.readBy.contains(widget.otherUser.uid)
+                            ? Icons.done_all
+                            : Icons.done,
                         size: 14,
-                        color: message.isRead
+                        color: message.readBy.contains(widget.otherUser.uid)
                             ? Colors.lightBlueAccent
                             : Colors.white70,
                       ),

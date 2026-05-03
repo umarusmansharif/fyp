@@ -10,6 +10,7 @@ import 'package:renthouse/screens/order_detail_screen.dart';
 import 'package:renthouse/screens/reviews_screen.dart';
 import 'package:renthouse/services/auth_service.dart';
 import 'package:renthouse/services/database_service.dart';
+import 'package:renthouse/services/notification_service.dart';
 import 'package:renthouse/utils/helpers.dart';
 import 'package:renthouse/widgets/custom_button.dart';
 import 'package:renthouse/widgets/image_carousel.dart';
@@ -32,6 +33,7 @@ class HouseDetailScreen extends StatefulWidget {
 class _HouseDetailScreenState extends State<HouseDetailScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final AuthService _authService = AuthService();
+  final NotificationService _notificationService = NotificationService();
   bool _isFavorite = false;
 
   @override
@@ -103,8 +105,6 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
         propertyTitle: widget.house.title,
         propertyLocation: widget.house.location,
         propertyPrice: widget.house.price,
-        propertyThumbnail: widget.house.images.isNotEmpty ? widget.house.images.first : widget.house.imageUrl,
-        otherUserName: landlord.name,
       );
 
       if (!mounted) return;
@@ -143,7 +143,19 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
 
       await _databaseService.createOrder(order);
 
-      // Create notification for landlord
+      // Send push notification to landlord
+      await _notificationService.sendNotification(
+        recipientId: widget.house.landlordId,
+        title: 'New Request',
+        body: 'Someone requested to visit your property',
+        data: {
+          'type': 'property_request',
+          'orderId': orderId,
+          'houseId': widget.house.houseId,
+        },
+      );
+
+      // Create notification for landlord (existing logic)
       final notificationId = const Uuid().v4();
       final notification = NotificationModel(
         id: notificationId,
@@ -529,7 +541,7 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
                         ),
                         const SizedBox(height: 10),
                         CustomButton(
-                          text: 'Request House',
+                          text: 'Request Visit',
                           onPressed: _requestHouse,
                           color: Colors.blue,
                           width: double.infinity,

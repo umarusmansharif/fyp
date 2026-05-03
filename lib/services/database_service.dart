@@ -1,19 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/models/house_model.dart';
-import 'package:renthouse/models/order_model.dart';
 import 'package:renthouse/models/user_model.dart';
-import 'package:renthouse/models/notification_model.dart';
+import 'package:renthouse/models/order_model.dart';
 import 'package:renthouse/models/chat_model.dart';
 import 'package:renthouse/models/message_model.dart';
+import 'package:renthouse/models/user_chat_model.dart';
 import 'package:renthouse/models/favorite_model.dart';
 import 'package:renthouse/models/review_model.dart';
-import 'package:renthouse/core/constants.dart';
+import 'package:renthouse/models/notification_model.dart';
 import 'package:renthouse/services/cloudinary_service.dart';
+import 'package:renthouse/services/notification_service.dart';
 import 'package:renthouse/utils/helpers.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final NotificationService _notificationService = NotificationService();
 
   // Get user by UID
   Future<UserModel?> getUser(String uid) async {
@@ -394,7 +398,7 @@ class DatabaseService {
 
   // ==================== CHAT METHODS ====================
 
-  // Create or get chat between tenant and landlord for a property
+  // Create or get chat between two users for a property
   Future<ChatModel> createOrGetChat({
     required String tenantId,
     required String landlordId,
@@ -402,47 +406,62 @@ class DatabaseService {
     required String propertyTitle,
     required String propertyLocation,
     required double propertyPrice,
-    required String propertyThumbnail,
-    required String otherUserName,
   }) async {
     try {
       final chatId = ChatModel.generateChatId(tenantId, landlordId, propertyId);
       
-      // Check if chat already exists
+      // Check if user has deleted this chat
+      final userChatDoc = await _firestore
+          .collection('userChats')
+          .doc(tenantId)
+          .collection('chats')
+          .doc(chatId)
+          .get();
+      
+      if (userChatDoc.exists) {
+        final userChatData = userChatDoc.data()!;
+        final isDeleted = userChatData['isDeleted'] ?? false;
+        
+        if (isDeleted) {
+          // Chat was deleted by this user, create a new one with timestamp
+          return await _createNewChatWithTimestamp(
+            tenantId, landlordId, propertyId,
+            propertyTitle, propertyLocation, propertyPrice,
+          );
+        }
+        
+        // Chat exists and not deleted, return it
+        final chatDoc = await _firestore
+            .collection(AppConstants.chatsCollection)
+            .doc(chatId)
+            .get();
+        
+        if (chatDoc.exists) {
+          return ChatModel.fromMap(chatDoc.data()!);
+        }
+      }
+      
+      // Check if chat document exists (for other user)
       final existingChat = await _firestore
           .collection(AppConstants.chatsCollection)
           .doc(chatId)
           .get();
       
       if (existingChat.exists) {
-        final chatData = existingChat.data()!;
-        // Check if current user (tenant) has deleted this chat
-        final deletedByTenant = chatData['deletedByTenant'] ?? false;
-        if (deletedByTenant) {
-          // Chat was deleted by tenant, create a new one with timestamp
-          return await _createNewChatWithTimestamp(
-            tenantId, landlordId, propertyId,
-            propertyTitle, propertyLocation, propertyPrice,
-            propertyThumbnail, otherUserName,
-          );
-        }
-        return ChatModel.fromMap(chatData);
+        // Chat exists but user hasn't deleted it, create userChats entry
+        await _createUserChatEntries(chatId, tenantId, landlordId);
+        return ChatModel.fromMap(existingChat.data()!);
       }
       
-      // Create new chat with property snapshot
+      // Create new chat
+      final now = DateTime.now();
       final newChat = ChatModel(
         chatId: chatId,
-        tenantId: tenantId,
-        landlordId: landlordId,
+        participants: [tenantId, landlordId],
         propertyId: propertyId,
-        propertyTitle: propertyTitle,
-        propertyLocation: propertyLocation,
-        propertyPrice: propertyPrice,
-        propertyThumbnail: propertyThumbnail,
-        otherUserId: landlordId,
-        otherUserName: otherUserName,
-        createdAt: DateTime.now(),
-        lastMessageAt: DateTime.now(),
+        lastMessage: '',
+        createdAt: now,
+        lastMessageAt: now,
       );
       
       await _firestore
@@ -450,22 +469,76 @@ class DatabaseService {
           .doc(chatId)
           .set(newChat.toMap());
       
-      // Auto-send property reference message from tenant
-      final propertyMessage = MessageModel(
-        messageId: const Uuid().v4(),
+      // Create userChats entries for both users
+      await _createUserChatEntries(chatId, tenantId, landlordId);
+      
+      // Send default first message
+      await _sendDefaultFirstMessage(
         chatId: chatId,
         senderId: tenantId,
-        content: 'Hi, I\'m interested in this property and would like to discuss further.\n\nProperty: $propertyTitle\nLocation: $propertyLocation\nPrice: ${Helpers.formatCurrency(propertyPrice)}',
-        timestamp: DateTime.now(),
-        type: MessageType.text,
+        propertyTitle: propertyTitle,
+        propertyLocation: propertyLocation,
+        propertyPrice: propertyPrice,
       );
-      
-      await sendMessage(propertyMessage);
       
       return newChat;
     } catch (e) {
       rethrow;
     }
+  }
+
+  // Create userChats entries for both participants
+  Future<void> _createUserChatEntries(String chatId, String tenantId, String landlordId) async {
+    final now = DateTime.now();
+    
+    // Create entry for tenant
+    await _firestore
+        .collection('userChats')
+        .doc(tenantId)
+        .collection('chats')
+        .doc(chatId)
+        .set(UserChatModel(
+          chatId: chatId,
+          lastMessage: '',
+          lastMessageTime: now,
+          unreadCount: 0,
+          isDeleted: false,
+        ).toMap());
+    
+    // Create entry for landlord
+    await _firestore
+        .collection('userChats')
+        .doc(landlordId)
+        .collection('chats')
+        .doc(chatId)
+        .set(UserChatModel(
+          chatId: chatId,
+          lastMessage: '',
+          lastMessageTime: now,
+          unreadCount: 0,
+          isDeleted: false,
+        ).toMap());
+  }
+
+  // Send default first message
+  Future<void> _sendDefaultFirstMessage({
+    required String chatId,
+    required String senderId,
+    required String propertyTitle,
+    required String propertyLocation,
+    required double propertyPrice,
+  }) async {
+    final message = MessageModel(
+      messageId: const Uuid().v4(),
+      chatId: chatId,
+      senderId: senderId,
+      content: 'Hi, I\'m interested in this property and would like to discuss further.\n\nProperty: $propertyTitle\nLocation: $propertyLocation\nPrice: ${Helpers.formatCurrency(propertyPrice)}',
+      timestamp: DateTime.now(),
+      type: MessageType.text,
+      readBy: [senderId], // Sender has read their own message
+    );
+    
+    await sendMessage(message, currentActiveChatId: chatId);
   }
 
   // Create new chat with timestamp-based ID (for re-chat after delete)
@@ -476,25 +549,18 @@ class DatabaseService {
     String propertyTitle,
     String propertyLocation,
     double propertyPrice,
-    String propertyThumbnail,
-    String otherUserName,
   ) async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final newChatId = '${tenantId}_${landlordId}_$propertyId$timestamp';
     
+    final now = DateTime.now();
     final newChat = ChatModel(
       chatId: newChatId,
-      tenantId: tenantId,
-      landlordId: landlordId,
+      participants: [tenantId, landlordId],
       propertyId: propertyId,
-      propertyTitle: propertyTitle,
-      propertyLocation: propertyLocation,
-      propertyPrice: propertyPrice,
-      propertyThumbnail: propertyThumbnail,
-      otherUserId: landlordId,
-      otherUserName: otherUserName,
-      createdAt: DateTime.now(),
-      lastMessageAt: DateTime.now(),
+      lastMessage: '',
+      createdAt: now,
+      lastMessageAt: now,
     );
     
     await _firestore
@@ -502,17 +568,17 @@ class DatabaseService {
         .doc(newChatId)
         .set(newChat.toMap());
     
-    // Auto-send property reference message from tenant
-    final propertyMessage = MessageModel(
-      messageId: const Uuid().v4(),
+    // Create userChats entries for both users
+    await _createUserChatEntries(newChatId, tenantId, landlordId);
+    
+    // Send default first message
+    await _sendDefaultFirstMessage(
       chatId: newChatId,
       senderId: tenantId,
-      content: 'Hi, I\'m interested in this property and would like to discuss further.\n\nProperty: $propertyTitle\nLocation: $propertyLocation\nPrice: ${Helpers.formatCurrency(propertyPrice)}',
-      timestamp: DateTime.now(),
-      type: MessageType.text,
+      propertyTitle: propertyTitle,
+      propertyLocation: propertyLocation,
+      propertyPrice: propertyPrice,
     );
-    
-    await sendMessage(propertyMessage);
     
     return newChat;
   }
@@ -520,64 +586,121 @@ class DatabaseService {
   // Delete chat for current user (per-user delete)
   Future<void> deleteChat(String chatId, String userId) async {
     try {
-      // Get chat to determine user role
-      final chatDoc = await _firestore
-          .collection(AppConstants.chatsCollection)
+      // Set isDeleted flag in userChats
+      await _firestore
+          .collection('userChats')
+          .doc(userId)
+          .collection('chats')
           .doc(chatId)
-          .get();
-      
-      if (!chatDoc.exists) return;
-      
-      final chatData = chatDoc.data()!;
-      final tenantId = chatData['tenantId'] as String;
-      final landlordId = chatData['landlordId'] as String;
-      
-      // Set appropriate delete flag based on user role
-      if (userId == tenantId) {
-        await _firestore
-            .collection(AppConstants.chatsCollection)
-            .doc(chatId)
-            .update({'deletedByTenant': true});
-      } else if (userId == landlordId) {
-        await _firestore
-            .collection(AppConstants.chatsCollection)
-            .doc(chatId)
-            .update({'deletedByLandlord': true});
-      }
+          .update({'isDeleted': true});
     } catch (e) {
       rethrow;
     }
   }
 
-  // Get user chats - Optimized with property context
-  Stream<List<ChatModel>> getUserChats(String userId) {
-    return _firestore
-        .collection(AppConstants.chatsCollection)
-        .where('tenantId', isEqualTo: userId)
-        .orderBy('lastMessageAt', descending: true)
-        .snapshots()
-        .asyncMap((tenantSnapshot) async {
-      final tenantChats = tenantSnapshot.docs
-          .map((doc) => ChatModel.fromMap(doc.data()))
-          .toList();
+  // Get user chats - Uses userChats collection for proper per-user control
+  // Falls back to old chats collection if userChats doesn't exist (migration path)
+  Stream<List<ChatModel>> getUserChats(String userId) async* {
+    try {
+      final userChatsStream = _firestore
+          .collection('userChats')
+          .doc(userId)
+          .collection('chats')
+          .where('isDeleted', isEqualTo: false)
+          .orderBy('lastMessageTime', descending: true)
+          .snapshots();
 
-      // Also get chats where user is landlord
-      final landlordSnapshot = await _firestore
+      await for (final userChatsSnapshot in userChatsStream) {
+        try {
+          final userChats = userChatsSnapshot.docs
+              .map((doc) => UserChatModel.fromMap(doc.data()))
+              .toList();
+
+          // Fetch actual chat documents
+          final chatIds = userChats.map((uc) => uc.chatId).toList();
+          if (chatIds.isEmpty) {
+            yield [];
+            continue;
+          }
+
+          final chatsSnapshot = await _firestore
+              .collection(AppConstants.chatsCollection)
+              .where(FieldPath.documentId, whereIn: chatIds)
+              .get();
+
+          final chats = chatsSnapshot.docs
+              .map((doc) => ChatModel.fromMap(doc.data()))
+              .toList();
+
+          // Sort by lastMessageTime from userChats
+          chats.sort((a, b) {
+            final aTime = userChats.firstWhere((uc) => uc.chatId == a.chatId).lastMessageTime;
+            final bTime = userChats.firstWhere((uc) => uc.chatId == b.chatId).lastMessageTime;
+            return bTime.compareTo(aTime);
+          });
+
+          yield chats;
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error processing userChats: $e');
+          }
+          yield [];
+        }
+      }
+    } catch (e) {
+      // Fallback: Query old chats collection where user is a participant
+      if (kDebugMode) {
+        print('userChats collection not found, falling back to old format: $e');
+      }
+      
+      // Query both new format (participants) and old format (tenantId/landlordId)
+      // We need to do this without rxdart by combining the results
+      
+      yield* _firestore
           .collection(AppConstants.chatsCollection)
-          .where('landlordId', isEqualTo: userId)
+          .where('participants', arrayContains: userId)
           .orderBy('lastMessageAt', descending: true)
-          .get();
-
-      final landlordChats = landlordSnapshot.docs
-          .map((doc) => ChatModel.fromMap(doc.data()))
-          .toList();
-
-      // Combine and sort
-      final allChats = [...tenantChats, ...landlordChats];
-      allChats.sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
-
-      return allChats;
-    });
+          .snapshots()
+          .asyncMap((participantsSnapshot) async {
+            final participantsChats = participantsSnapshot.docs
+                .map((doc) => ChatModel.fromMap(doc.data()))
+                .toList();
+            
+            // Also query old format chats
+            final tenantSnapshot = await _firestore
+                .collection(AppConstants.chatsCollection)
+                .where('tenantId', isEqualTo: userId)
+                .get();
+            
+            final landlordSnapshot = await _firestore
+                .collection(AppConstants.chatsCollection)
+                .where('landlordId', isEqualTo: userId)
+                .get();
+            
+            final tenantChats = tenantSnapshot.docs
+                .map((doc) => ChatModel.fromMap(doc.data()))
+                .toList();
+            
+            final landlordChats = landlordSnapshot.docs
+                .map((doc) => ChatModel.fromMap(doc.data()))
+                .toList();
+            
+            // Combine and deduplicate by chatId
+            final allChats = <String, ChatModel>{};
+            for (final chat in participantsChats) {
+              allChats[chat.chatId] = chat;
+            }
+            for (final chat in tenantChats) {
+              allChats[chat.chatId] = chat;
+            }
+            for (final chat in landlordChats) {
+              allChats[chat.chatId] = chat;
+            }
+            
+            return allChats.values.toList()
+              ..sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
+          });
+    }
   }
   
   // Update chat with last message
@@ -609,15 +732,15 @@ class DatabaseService {
     });
   }
 
-  // Send message - Updates chat last message and unread count
-  Future<void> sendMessage(MessageModel message) async {
+  // Send message - Updates chat last message and userChats unread count
+  Future<void> sendMessage(MessageModel message, {String? currentActiveChatId}) async {
     try {
       await _firestore
           .collection(AppConstants.messagesCollection)
           .doc(message.messageId)
           .set(message.toMap());
 
-      // Get chat to determine recipient
+      // Get chat to determine participants
       final chatDoc = await _firestore
           .collection(AppConstants.chatsCollection)
           .doc(message.chatId)
@@ -625,70 +748,145 @@ class DatabaseService {
       
       if (chatDoc.exists) {
         final chatData = chatDoc.data()!;
-        final tenantId = chatData['tenantId'] as String;
-        final landlordId = chatData['landlordId'] as String;
+        final participants = List<String>.from(chatData['participants'] ?? []);
         
-        // Determine recipient (the other user)
-        final recipientId = message.senderId == tenantId ? landlordId : tenantId;
+        // Determine recipient (the other user) with fallback
+        String? recipientId;
+        try {
+          recipientId = participants.firstWhere((id) => id != message.senderId);
+        } catch (e) {
+          // Fallback to old format if participants array is not working
+          if (chatData['tenantId'] != null && chatData['landlordId'] != null) {
+            recipientId = message.senderId == chatData['tenantId'] 
+                ? chatData['landlordId']?.toString() 
+                : chatData['tenantId']?.toString();
+          }
+        }
         
-        // Increment unread count for recipient only
+        if (recipientId == null) {
+          if (kDebugMode) {
+            print('Could not determine recipient for message');
+          }
+          return;
+        }
+        
+        // Update chat document
         await _firestore
             .collection(AppConstants.chatsCollection)
             .doc(message.chatId)
             .update({
-          'lastMessageAt': Timestamp.fromDate(message.timestamp),
           'lastMessage': message.content,
-          'unreadCount': FieldValue.increment(1),
+          'lastMessageAt': Timestamp.fromDate(message.timestamp),
         });
-      } else {
-        // Fallback if chat doesn't exist
+
+        // Update userChats for sender (unreadCount = 0)
         await _firestore
-            .collection(AppConstants.chatsCollection)
+            .collection('userChats')
+            .doc(message.senderId)
+            .collection('chats')
             .doc(message.chatId)
             .update({
-          'lastMessageAt': Timestamp.fromDate(message.timestamp),
           'lastMessage': message.content,
+          'lastMessageTime': Timestamp.fromDate(message.timestamp),
+          'unreadCount': 0,
         });
+
+        // Update userChats for recipient (unreadCount += 1)
+        final recipientUserChatRef = _firestore
+            .collection('userChats')
+            .doc(recipientId)
+            .collection('chats')
+            .doc(message.chatId);
+        
+        // Check if recipient has deleted this chat
+        final recipientUserChatDoc = await recipientUserChatRef.get();
+        if (recipientUserChatDoc.exists && recipientUserChatDoc.data()?['isDeleted'] == true) {
+          // Re-enable chat for recipient (delete = hide history, not block future messages)
+          await recipientUserChatRef.update({
+            'isDeleted': false,
+            'unreadCount': 1,
+            'lastMessage': message.content,
+            'lastMessageTime': Timestamp.fromDate(message.timestamp),
+          });
+        } else {
+          // Normal update
+          await recipientUserChatRef.update({
+            'lastMessage': message.content,
+            'lastMessageTime': Timestamp.fromDate(message.timestamp),
+            'unreadCount': FieldValue.increment(1),
+          });
+        }
+
+        // Send push notification to recipient (only if they're not in the same chat)
+        if (currentActiveChatId != message.chatId) {
+          await _notificationService.sendNotification(
+            recipientId: recipientId,
+            title: 'New Message',
+            body: 'You have received a new message',
+            data: {
+              'type': 'chat_message',
+              'chatId': message.chatId,
+              'senderId': message.senderId,
+            },
+          );
+        }
       }
     } catch (e) {
       rethrow;
     }
   }
 
-  // Mark message as read
-  Future<void> markMessageAsRead(String messageId) async {
-    try {
-      await _firestore
-          .collection(AppConstants.messagesCollection)
-          .doc(messageId)
-          .update({'isRead': true});
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  // Mark all messages in chat as read
+  // Mark all messages in chat as read for a user
   Future<void> markAllMessagesAsRead(String chatId, String userId) async {
     try {
+      // Add userId to readBy for all messages not yet read by this user
       final snapshot = await _firestore
           .collection(AppConstants.messagesCollection)
           .where('chatId', isEqualTo: chatId)
-          .where('senderId', isNotEqualTo: userId)
-          .where('isRead', isEqualTo: false)
+          .where('readBy', arrayContains: userId)
           .get();
 
-      for (var doc in snapshot.docs) {
-        await doc.reference.update({'isRead': true});
+      final readMessageIds = snapshot.docs.map((doc) => doc.id).toSet();
+
+      final unreadSnapshot = await _firestore
+          .collection(AppConstants.messagesCollection)
+          .where('chatId', isEqualTo: chatId)
+          .get();
+
+      for (var doc in unreadSnapshot.docs) {
+        if (!readMessageIds.contains(doc.id)) {
+          await doc.reference.update({
+            'readBy': FieldValue.arrayUnion([userId])
+          });
+        }
       }
 
-      // Reset unread count in chat document
+      // Reset unread count in userChats
       await _firestore
-          .collection(AppConstants.chatsCollection)
+          .collection('userChats')
+          .doc(userId)
+          .collection('chats')
           .doc(chatId)
           .update({'unreadCount': 0});
     } catch (e) {
       rethrow;
     }
+  }
+
+  // Get total unread count for a user across all chats (for dashboard badge)
+  Stream<int> getTotalUnreadCount(String userId) {
+    return _firestore
+        .collection('userChats')
+        .doc(userId)
+        .collection('chats')
+        .where('isDeleted', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.fold<int>(
+        0,
+        (sum, doc) => sum + (doc.data()['unreadCount'] as int? ?? 0),
+      );
+    });
   }
 
   // ==================== REVIEWS METHODS ====================

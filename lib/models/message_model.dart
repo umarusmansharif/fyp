@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum MessageType { text, image, system } // Added system type
+enum MessageType { text, image, system }
 
 class MessageModel {
   final String messageId;
@@ -9,7 +9,7 @@ class MessageModel {
   final String content;
   final String? imageUrl;
   final DateTime timestamp;
-  final bool isRead;
+  final List<String> readBy; // Array of user IDs who have read this message
   final MessageType type;
 
   MessageModel({
@@ -19,9 +19,9 @@ class MessageModel {
     required this.content,
     this.imageUrl,
     required this.timestamp,
-    this.isRead = false,
+    List<String>? readBy,
     this.type = MessageType.text,
-  });
+  }) : readBy = readBy ?? [];
 
   Map<String, dynamic> toMap() {
     return {
@@ -31,7 +31,7 @@ class MessageModel {
       'content': content,
       'imageUrl': imageUrl,
       'timestamp': Timestamp.fromDate(timestamp),
-      'isRead': isRead,
+      'readBy': readBy,
       'type': type.name,
     };
   }
@@ -44,7 +44,7 @@ class MessageModel {
       content: map['content']?.toString() ?? '',
       imageUrl: map['imageUrl'],
       timestamp: (map['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      isRead: map['isRead'] ?? false,
+      readBy: List<String>.from(map['readBy'] ?? []),
       type: MessageType.values.firstWhere(
         (e) => e.name == map['type'],
         orElse: () => MessageType.text,

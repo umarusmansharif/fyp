@@ -3,10 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:renthouse/models/user_model.dart';
 import 'package:renthouse/core/constants.dart';
+import 'package:renthouse/services/notification_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final NotificationService _notificationService = NotificationService();
 
   // Get current user
   User? getCurrentUser() {
@@ -20,6 +22,15 @@ class AuthService {
         email: email,
         password: password,
       );
+      
+      // Initialize FCM and save token
+      if (result.user != null) {
+        final fcmToken = await _notificationService.initializeFCM();
+        if (fcmToken != null) {
+          await _notificationService.saveFCMToken(result.user!.uid, fcmToken);
+        }
+      }
+      
       return result.user;
     } catch (e) {
       rethrow;

@@ -30,12 +30,14 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   int _selectedCategory = 0;
   Position? _userPosition;
   bool _isLoadingLocation = false;
+  int _totalUnreadCount = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadUserData();
+    _listenToUnreadCount();
   }
 
   @override
@@ -59,6 +61,19 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       final userData = await _databaseService.getUser(user.uid);
       setState(() {
         _currentUser = userData;
+      });
+    }
+  }
+
+  void _listenToUnreadCount() {
+    final user = _authService.getCurrentUser();
+    if (user != null) {
+      _databaseService.getTotalUnreadCount(user.uid).listen((count) {
+        if (mounted) {
+          setState(() {
+            _totalUnreadCount = count;
+          });
+        }
       });
     }
   }
@@ -716,24 +731,53 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
             break;
         }
       },
-      items: const [
-        BottomNavigationBarItem(
+      items: [
+        const BottomNavigationBarItem(
           icon: Icon(Icons.home),
           label: 'Home',
         ),
-        BottomNavigationBarItem(
+        const BottomNavigationBarItem(
           icon: Icon(Icons.search),
           label: 'Search',
         ),
-        BottomNavigationBarItem(
+        const BottomNavigationBarItem(
           icon: Icon(Icons.notifications),
           label: 'Notifications',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.chat),
+          icon: Stack(
+            children: [
+              const Icon(Icons.chat),
+              if (_totalUnreadCount > 0)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      _totalUnreadCount > 99 ? '99+' : _totalUnreadCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           label: 'Chat',
         ),
-        BottomNavigationBarItem(
+        const BottomNavigationBarItem(
           icon: Icon(Icons.favorite),
           label: 'Favorite',
         ),

@@ -7,6 +7,7 @@ import 'package:renthouse/models/user_model.dart';
 import 'package:renthouse/models/house_model.dart';
 import 'package:renthouse/services/auth_service.dart';
 import 'package:renthouse/services/database_service.dart';
+import 'package:renthouse/services/notification_service.dart';
 import 'package:renthouse/utils/helpers.dart';
 import 'package:renthouse/widgets/custom_app_bar.dart';
 import 'package:renthouse/widgets/custom_button.dart';
@@ -23,6 +24,7 @@ class OrderDetailScreen extends StatefulWidget {
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final AuthService _authService = AuthService();
+  final NotificationService _notificationService = NotificationService();
   HouseModel? _house;
   bool _isLoading = false;
 
@@ -97,6 +99,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           .collection(AppConstants.ordersCollection)
           .doc(widget.order.orderId)
           .update({'status': status});
+
+      // Send notification to tenant based on status
+      if (status == AppConstants.orderStatusAccepted) {
+        await _notificationService.sendNotification(
+          recipientId: widget.order.tenantId,
+          title: 'Request Accepted',
+          body: 'Your visit request has been accepted',
+          data: {
+            'type': 'request_response',
+            'orderId': widget.order.orderId,
+            'houseId': widget.order.houseId,
+            'status': 'accepted',
+          },
+        );
+      } else if (status == AppConstants.orderStatusRejected) {
+        await _notificationService.sendNotification(
+          recipientId: widget.order.tenantId,
+          title: 'Request Declined',
+          body: 'Your request was declined',
+          data: {
+            'type': 'request_response',
+            'orderId': widget.order.orderId,
+            'houseId': widget.order.houseId,
+            'status': 'rejected',
+          },
+        );
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -18,13 +18,11 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObserver {
   final DatabaseService _databaseService = DatabaseService();
   final AuthService _authService = AuthService();
-  UserModel? _currentUser;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _currentUser = widget.currentUser;
     _refreshCurrentUser();
   }
 
@@ -48,7 +46,7 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
       final freshData = await _databaseService.getUser(user.uid);
       if (freshData != null && mounted) {
         setState(() {
-          _currentUser = freshData;
+          // Data refreshed, can be used from widget.currentUser
         });
       }
     }
@@ -133,23 +131,22 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
 
           final chats = snapshot.data!;
 
-          // Filter out deleted chats at UI level
-          final activeChats = chats.where((chat) {
-            if (chat.tenantId == userId) {
-              return !chat.deletedByTenant;
-            } else {
-              return !chat.deletedByLandlord;
-            }
-          }).toList();
-
+          // Get the other user ID from participants
           return ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: activeChats.length,
+            itemCount: chats.length,
             itemBuilder: (context, index) {
-              final chat = activeChats[index];
-              final otherUserId = chat.tenantId == userId
-                  ? chat.landlordId
-                  : chat.tenantId;
+              final chat = chats[index];
+              
+              // Handle empty participants or case where only current user is in participants
+              if (chat.participants.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              
+              final otherUserId = chat.participants.firstWhere(
+                (id) => id != userId,
+                orElse: () => chat.participants[0],
+              );
 
               return FutureBuilder<UserModel?>(
                 future: _databaseService.getUser(otherUserId),
@@ -266,7 +263,7 @@ class _ChatListScreenState extends State<ChatListScreen> with WidgetsBindingObse
   Stream<int> _getUnreadCount(String chatId, String userId) {
     return _databaseService.getChatMessages(chatId).map((messages) {
       return messages
-          .where((msg) => msg.senderId != userId && !msg.isRead)
+          .where((msg) => msg.senderId != userId && !msg.readBy.contains(userId))
           .length;
     });
   }
