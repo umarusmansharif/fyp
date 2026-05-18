@@ -94,36 +94,61 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<void> _updateOrderStatus(String status) async {
     try {
+      // FIRST CHECK current order status to prevent duplicate processing
+      final orderDoc = await FirebaseFirestore.instance
+          .collection(AppConstants.ordersCollection)
+          .doc(widget.order.orderId)
+          .get();
+
+      if (!orderDoc.exists) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Order not found.'),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+        return;
+      }
+
+      final currentStatus = orderDoc.data()?['status'] as String?;
+
+      // Prevent duplicate accept/reject
+      if (currentStatus == AppConstants.orderStatusAccepted || 
+          currentStatus == AppConstants.orderStatusRejected) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This request has already been processed.'),
+            backgroundColor: Color(0xFFF59E0B),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
       // Update order status
       await FirebaseFirestore.instance
           .collection(AppConstants.ordersCollection)
           .doc(widget.order.orderId)
           .update({'status': status});
 
+      final house = await _databaseService.getHouseById(widget.order.houseId);
+
       // Send notification to tenant based on status
       if (status == AppConstants.orderStatusAccepted) {
-        await _notificationService.sendNotification(
-          recipientId: widget.order.tenantId,
-          title: 'Request Accepted',
-          body: 'Your visit request has been accepted',
-          data: {
-            'type': 'request_response',
-            'orderId': widget.order.orderId,
-            'houseId': widget.order.houseId,
-            'status': 'accepted',
-          },
+        await _notificationService.sendRequestResponseNotification(
+          tenantId: widget.order.tenantId,
+          isAccepted: true,
+          propertyId: widget.order.houseId,
+          propertyTitle: house?.title,
         );
       } else if (status == AppConstants.orderStatusRejected) {
-        await _notificationService.sendNotification(
-          recipientId: widget.order.tenantId,
-          title: 'Request Declined',
-          body: 'Your request was declined',
-          data: {
-            'type': 'request_response',
-            'orderId': widget.order.orderId,
-            'houseId': widget.order.houseId,
-            'status': 'rejected',
-          },
+        await _notificationService.sendRequestResponseNotification(
+          tenantId: widget.order.tenantId,
+          isAccepted: false,
+          propertyId: widget.order.houseId,
+          propertyTitle: house?.title,
         );
       }
 

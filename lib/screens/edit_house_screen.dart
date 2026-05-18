@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:renthouse/core/constants.dart';
+import 'package:renthouse/core/property_types.dart';
 import 'package:renthouse/models/house_model.dart';
 import 'package:renthouse/services/auth_service.dart';
 import 'package:renthouse/services/database_service.dart';
@@ -27,7 +28,7 @@ class _EditHouseScreenState extends State<EditHouseScreen> {
   final _descriptionController = TextEditingController();
   final _locationController = TextEditingController();
   final _areaController = TextEditingController();
-  final _houseTypeController = TextEditingController();
+  String? _houseType;
   final _roomsController = TextEditingController();
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
@@ -61,7 +62,7 @@ class _EditHouseScreenState extends State<EditHouseScreen> {
     _descriptionController.text = widget.house.description;
     _locationController.text = widget.house.location;
     _areaController.text = widget.house.area.toString();
-    _houseTypeController.text = widget.house.houseType;
+    _houseType = widget.house.houseType;
     _roomsController.text = widget.house.numberOfRooms.toString();
     
     // Initialize location
@@ -130,7 +131,6 @@ class _EditHouseScreenState extends State<EditHouseScreen> {
     _descriptionController.dispose();
     _locationController.dispose();
     _areaController.dispose();
-    _houseTypeController.dispose();
     _roomsController.dispose();
     super.dispose();
   }
@@ -178,7 +178,7 @@ class _EditHouseScreenState extends State<EditHouseScreen> {
           latitude: _latitude ?? widget.house.latitude,
           longitude: _longitude ?? widget.house.longitude,
           area: double.tryParse(_areaController.text.trim()) ?? widget.house.area,
-          houseType: _houseTypeController.text.trim(),
+          houseType: _houseType?.trim().isNotEmpty == true ? _houseType!.trim() : widget.house.houseType,
           numberOfRooms: int.tryParse(_roomsController.text.trim()) ?? widget.house.numberOfRooms,
           images: finalImages,
           amenities: _selectedAmenities,
@@ -292,16 +292,22 @@ class _EditHouseScreenState extends State<EditHouseScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                CustomTextField(
-                  controller: _houseTypeController,
-                  labelText: 'House Type',
-                  prefixIcon: Icons.home,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter house type';
-                    }
-                    return null;
-                  },
+                DropdownButtonFormField<String>(
+                  value: _houseType != null && PropertyTypes.values.contains(_houseType)
+                      ? _houseType
+                      : null,
+                  items: PropertyTypes.values
+                      .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                      .toList(),
+                  onChanged: (value) => setState(() => _houseType = value),
+                  decoration: InputDecoration(
+                    labelText: 'House Type',
+                    prefixIcon: const Icon(Icons.home),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  validator: (value) => value == null || value.isEmpty ? 'Please select house type' : null,
                 ),
                 const SizedBox(height: 20),
                 

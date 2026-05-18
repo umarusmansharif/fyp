@@ -93,6 +93,20 @@ class DatabaseService {
     }
   }
 
+  Future<ChatModel?> getChatById(String chatId) async {
+    try {
+      DocumentSnapshot doc =
+          await _firestore.collection(AppConstants.chatsCollection).doc(chatId).get();
+      
+      if (doc.exists) {
+        return ChatModel.fromMap(doc.data() as Map<String, dynamic>);
+      }
+      return null;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   // Create order
   Future<void> createOrder(OrderModel order) async {
     try {
@@ -131,6 +145,86 @@ class DatabaseService {
           .map((doc) => OrderModel.fromMap(doc.data()))
           .toList();
     });
+  }
+
+  // Check if tenant has an existing pending/accepted request for a property
+  Future<bool> hasPendingOrAcceptedRequest(String tenantId, String houseId) async {
+    try {
+      final snapshot = await _firestore
+          .collection(AppConstants.ordersCollection)
+          .where('tenantId', isEqualTo: tenantId)
+          .where('houseId', isEqualTo: houseId)
+          .where('status', whereIn: [
+            AppConstants.orderStatusPending,
+            AppConstants.orderStatusAccepted,
+          ])
+          .get();
+      
+      return snapshot.docs.isNotEmpty;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<bool> hasPendingVisitRequest(String tenantId, String listingId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('visit_requests')
+          .where('tenantId', isEqualTo: tenantId)
+          .where('listingId', isEqualTo: listingId)
+          .where('status', isEqualTo: AppConstants.orderStatusPending)
+          .get();
+
+      return snapshot.docs.isNotEmpty;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<String> createVisitRequest({
+    required String tenantId,
+    required String ownerId,
+    required String listingId,
+    required String tenantName,
+    required String listingTitle,
+  }) async {
+    try {
+      final requestId = const Uuid().v4();
+      await _firestore.collection('visit_requests').doc(requestId).set({
+        'requestId': requestId,
+        'tenantId': tenantId,
+        'ownerId': ownerId,
+        'listingId': listingId,
+        'tenantName': tenantName,
+        'listingTitle': listingTitle,
+        'status': AppConstants.orderStatusPending,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      return requestId;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Get visit requests for a landlord
+  Stream<QuerySnapshot> getVisitRequestsForLandlord(String landlordId) {
+    return _firestore
+        .collection('visit_requests')
+        .where('ownerId', isEqualTo: landlordId)
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  // Update visit request status
+  Future<void> updateVisitRequestStatus(String requestId, String status) async {
+    try {
+      await _firestore
+          .collection('visit_requests')
+          .doc(requestId)
+          .update({'status': status});
+    } catch (e) {
+      rethrow;
+    }
   }
 
   // Create notification
@@ -237,6 +331,18 @@ class DatabaseService {
     }
   }
 
+  // Update user profile field
+  Future<void> updateUserProfileField(String userId, String field, String value) async {
+    try {
+      await _firestore
+          .collection(AppConstants.usersCollection)
+          .doc(userId)
+          .update({field: value});
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   // Update house status
   Future<void> updateHouseStatus(String houseId, String status) async {
     try {
@@ -254,7 +360,6 @@ class DatabaseService {
   // Search houses with filters
   Stream<List<HouseModel>> searchHouses({
     String? query,
-    double? minPrice,
     double? maxPrice,
     String? propertyType,
     int? rooms,
@@ -265,10 +370,7 @@ class DatabaseService {
         .collection(AppConstants.housesCollection)
         .orderBy('createdAt', descending: true);
 
-    // Apply filters
-    if (minPrice != null) {
-      queryRef = queryRef.where('price', isGreaterThanOrEqualTo: minPrice);
-    }
+    // Apply Firestore-level filters
     if (maxPrice != null) {
       queryRef = queryRef.where('price', isLessThanOrEqualTo: maxPrice);
     }
@@ -288,18 +390,21 @@ class DatabaseService {
           .toList();
 
       // Apply client-side filters for text search and amenities
-      if (query != null && query.isNotEmpty) {
+      // These filters work together with Firestore filters
+      if (query != null && query.trim().isNotEmpty) {
+        final searchText = query.trim().toLowerCase();
         houses = houses.where((house) {
-          final searchText = query.toLowerCase();
-          return house.title.toLowerCase().contains(searchText) ||
-              house.description.toLowerCase().contains(searchText) ||
-              house.location.toLowerCase().contains(searchText);
+          final titleMatch = house.title?.toLowerCase().contains(searchText) ?? false;
+          final descriptionMatch = house.description?.toLowerCase().contains(searchText) ?? false;
+          final locationMatch = house.location?.toLowerCase().contains(searchText) ?? false;
+          return titleMatch || descriptionMatch || locationMatch;
         }).toList();
       }
 
       if (amenities != null && amenities.isNotEmpty) {
         houses = houses.where((house) {
-          return amenities.every((amenity) => house.amenities.contains(amenity));
+          final houseAmenities = house.amenities ?? [];
+          return amenities.every((amenity) => houseAmenities.contains(amenity));
         }).toList();
       }
 
@@ -819,15 +924,9 @@ class DatabaseService {
 
         // Send push notification to recipient (only if they're not in the same chat)
         if (currentActiveChatId != message.chatId) {
-          await _notificationService.sendNotification(
+          await _notificationService.sendChatMessageNotification(
             recipientId: recipientId,
-            title: 'New Message',
-            body: 'You have received a new message',
-            data: {
-              'type': 'chat_message',
-              'chatId': message.chatId,
-              'senderId': message.senderId,
-            },
+            chatId: message.chatId,
           );
         }
       }

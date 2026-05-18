@@ -61,24 +61,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       maxHeight: 1024,
       imageQuality: 85,
     );
-    
+
     if (image == null) return;
-    
+
     if (widget.user == null) return;
-    
+
     setState(() {
       _isUploadingImage = true;
     });
-    
+
     try {
       // Upload image to Cloudinary using the same service as property images
       File imageFile = File(image.path);
       String? imageUrl = await CloudinaryService.uploadImageToCloudinary(imageFile);
-      
+
       if (imageUrl != null && imageUrl.isNotEmpty) {
         // Update user profile in database
         await _databaseService.updateUserProfileImage(widget.user!.uid, imageUrl);
-        
+
         // Fetch updated user data to refresh UI immediately
         final updatedUser = await _databaseService.getUser(widget.user!.uid);
         if (updatedUser != null && mounted) {
@@ -87,10 +87,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _profileUpdated = true;
           });
         }
-        
+
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+           SnackBar(
             content: Text('Profile image updated successfully'),
             backgroundColor: Color(0xFF10B981),
             behavior: SnackBarBehavior.floating,
@@ -115,6 +115,100 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     }
+  }
+
+  Future<void> _editField(String fieldName, String currentValue) async {
+    final TextEditingController controller = TextEditingController(text: currentValue);
+    
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Edit $fieldName'),
+          content: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              labelText: fieldName,
+              border: const OutlineInputBorder(),
+            ),
+            keyboardType: fieldName == 'Phone' ? TextInputType.phone : TextInputType.emailAddress,
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Save'),
+              onPressed: () async {
+                final newValue = controller.text.trim();
+                if (newValue.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('$fieldName cannot be empty')),
+                  );
+                  return;
+                }
+                
+                // Validate phone format
+                if (fieldName == 'Phone' && !RegExp(r'^(\+92|0)[0-9]{10}$').hasMatch(newValue)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid phone number')),
+                  );
+                  return;
+                }
+                
+                // Validate email format
+                if (fieldName == 'Email' && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(newValue)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid email')),
+                  );
+                  return;
+                }
+                
+                Navigator.of(context).pop();
+                
+                try {
+                  await _databaseService.updateUserProfileField(
+                    widget.user!.uid,
+                    fieldName.toLowerCase(),
+                    newValue,
+                  );
+                  
+                  // Fetch updated user data
+                  final updatedUser = await _databaseService.getUser(widget.user!.uid);
+                  if (updatedUser != null && mounted) {
+                    setState(() {
+                      _currentUser = updatedUser;
+                      _profileUpdated = true;
+                    });
+                  }
+                  
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                     SnackBar(
+                      content: Text('$fieldName updated successfully'),
+                      backgroundColor: Color(0xFF10B981),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error updating $fieldName: ${e.toString()}'),
+                      backgroundColor: const Color(0xFFEF4444),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -226,15 +320,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 15),
-              _buildInfoCard('Phone', _currentUser?.phone ?? ''),
+              _buildInfoCard('Phone', _currentUser?.phone ?? '', onEdit: () => _editField('Phone', _currentUser?.phone ?? '')),
               const SizedBox(height: 15),
-              _buildInfoCard('Email', _currentUser?.email ?? ''),
+              _buildInfoCard('Email', _currentUser?.email ?? '', onEdit: () => _editField('Email', _currentUser?.email ?? '')),
               const SizedBox(height: 15),
               _buildInfoCard(
                   'User Type',
                   _currentUser?.userType == AppConstants.userTypeTenant
                       ? 'Tenant'
-                      : 'Landlord'),
+                      : 'Landlord',
+                  isEditable: false),
               const SizedBox(height: 30),
               // Conditional content based on user type
               if (_currentUser?.userType == AppConstants.userTypeLandlord) ...[
@@ -588,7 +683,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoCard(String label, String value) {
+  Widget _buildInfoCard(String label, String value, {bool isEditable = true, VoidCallback? onEdit}) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -609,6 +704,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
+            if (isEditable && onEdit != null)
+              IconButton(
+                icon: const Icon(Icons.edit, size: 20),
+                onPressed: onEdit,
+                color: const Color(0xFF1A237E),
+              ),
           ],
         ),
       ),

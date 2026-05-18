@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:renthouse/core/constants.dart';
+import 'package:renthouse/core/property_types.dart';
 import 'package:renthouse/models/house_model.dart';
 import 'package:renthouse/services/auth_service.dart';
 import 'package:renthouse/services/database_service.dart';
@@ -26,12 +27,12 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
   final _descriptionController = TextEditingController();
   final _locationController = TextEditingController();
   final _areaController = TextEditingController();
-  final _houseTypeController = TextEditingController();
   final _roomsController = TextEditingController();
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   bool _isLoading = false;
   List<XFile> _selectedImages = [];
+  String? _houseType;
   
   // Location fields
   double? _latitude;
@@ -98,7 +99,6 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
     _descriptionController.dispose();
     _locationController.dispose();
     _areaController.dispose();
-    _houseTypeController.dispose();
     super.dispose();
   }
 
@@ -159,7 +159,7 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
           latitude: _latitude ?? 0.0,
           longitude: _longitude ?? 0.0,
           area: double.tryParse(_areaController.text.trim()) ?? 0.0,
-          houseType: _houseTypeController.text.trim(),
+          houseType: _houseType ?? PropertyTypes.values.first,
           numberOfRooms: int.tryParse(_roomsController.text.trim()) ?? 0,
           images: imageUrls,
           amenities: _selectedAmenities,
@@ -180,7 +180,6 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
         _descriptionController.clear();
         _locationController.clear();
         _areaController.clear();
-        _houseTypeController.clear();
         _roomsController.clear();
         _selectedImages.clear();
         _latitude = null;
@@ -354,16 +353,20 @@ class _AddHouseScreenState extends State<AddHouseScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                CustomTextField(
-                  controller: _houseTypeController,
-                  labelText: 'House Type',
-                  prefixIcon: Icons.home,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter house type';
-                    }
-                    return null;
-                  },
+                DropdownButtonFormField<String>(
+                  value: _houseType ?? PropertyTypes.values.first,
+                  items: PropertyTypes.values
+                      .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                      .toList(),
+                  onChanged: (value) => setState(() => _houseType = value),
+                  decoration: InputDecoration(
+                    labelText: 'House Type',
+                    prefixIcon: const Icon(Icons.home),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  validator: (value) => value == null || value.isEmpty ? 'Please select house type' : null,
                 ),
                 const SizedBox(height: 20),
                 

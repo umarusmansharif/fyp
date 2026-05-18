@@ -1,1 +1,28 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"renthouse-d5d9e","appId":"1:202908665820:android:285aee51eceb6193663119","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"renthouse-d5d9e","configurations":{"android":"1:202908665820:android:285aee51eceb6193663119","ios":"1:202908665820:ios:5207687661400d1e663119","web":"1:202908665820:web:97dbaef2c1ad607c663119","windows":"1:202908665820:web:a7032c36e514b193663119"}}}}}}
+{
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs18"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "renthouse-d5d9e",
+          "appId": "1:202908665820:android:285aee51eceb6193663119",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "renthouse-d5d9e",
+          "configurations": {
+            "android": "1:202908665820:android:285aee51eceb6193663119",
+            "ios": "1:202908665820:ios:5207687661400d1e663119",
+            "web": "1:202908665820:web:97dbaef2c1ad607c663119",
+            "windows": "1:202908665820:web:a7032c36e514b193663119"
+          }
+        }
+      }
+    }
+  }
+}

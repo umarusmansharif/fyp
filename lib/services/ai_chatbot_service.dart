@@ -1,106 +1,103 @@
-// ignore: unused_import
-import 'dart:convert';
-// ignore: unused_import
-import 'package:http/http.dart' as http;
+import 'package:renthouse/services/n8n_ai_service.dart';
+import 'package:renthouse/core/constants.dart';
+import 'package:renthouse/services/auth_service.dart';
+import 'package:renthouse/services/database_service.dart';
 
 class AIChatbotService {
-  // You can replace this with your preferred AI API
-  // For now, using a rule-based system with predefined responses
+  final N8NAIService _n8nService = N8NAIService();
+  final AuthService _authService = AuthService();
   
-  // ignore: unused_field
-  static const String _apiKey = 'YOUR_API_KEY'; // Replace with actual API key
-  // ignore: unused_field
-  static const String _apiUrl = 'https://api.openai.com/v1/chat/completions';
-
-  // Predefined responses for common questions
-  static final Map<String, String> _predefinedResponses = {
+  // Fallback responses for when N8N is not available
+  static final Map<String, String> _fallbackResponses = {
     'hello': 'Hello! Welcome to RentHouse. How can I help you today?',
     'hi': 'Hi there! I\'m here to help you with rental-related questions.',
-    'how to use': 'To use RentHouse:\n\n1. **Tenants**: Browse properties, save favorites, and contact landlords\n2. **Landlords**: Add property listings, manage requests, and chat with tenants\n\nWhat would you like to know more about?',
-    'search': 'You can search for properties by:\n• Location\n• Price range\n• Property type\n• Number of rooms\n• Amenities\n\nUse the Search tab to apply filters!',
-    'add property': 'To add a property listing:\n1. Go to your Profile\n2. Tap "Add House" button\n3. Fill in property details\n4. Upload photos\n5. Submit the listing\n\nMake sure to provide accurate information!',
-    'contact landlord': 'You can contact landlords in two ways:\n1. **In-app Chat**: Tap the Chat button on the property page\n2. **WhatsApp**: Use the WhatsApp button for direct messaging\n\nWhich would you prefer?',
-    'favorite': 'To save a property to favorites:\n• Tap the heart icon on any property card\n• View all favorites in the Favorites tab\n• Remove anytime by tapping the heart again',
-    'price': 'Property prices are listed in Pakistani Rupees (₨).\n\nYou can filter by price range in the Search screen to find properties within your budget.',
-    'location': 'You can find properties by:\n• Browsing the map view\n• Searching by location name\n• Filtering by area\n\nEnable location services for nearby properties!',
-    'safety': 'Safety tips:\n• Always verify property before payment\n• Meet landlords in person\n• Check property documents\n• Use in-app chat for records\n• Report suspicious listings',
-    'payment': 'Payment arrangements should be discussed directly with the landlord.\n\nWe recommend:\n• Getting a receipt\n• Using bank transfers\n• Avoiding cash payments\n• Reading the lease carefully',
-    'lease': 'A lease agreement should include:\n• Rent amount and due date\n• Lease duration\n• Security deposit\n• Maintenance responsibilities\n• Termination conditions\n\nAlways read carefully before signing!',
     'help': 'I can help you with:\n• Finding properties\n• Adding listings\n• Using app features\n• Rental tips\n• Safety guidelines\n\nWhat do you need help with?',
   };
 
   Future<String> getResponse(String userMessage) async {
     try {
-      // First check for predefined responses
-      final lowerMessage = userMessage.toLowerCase();
-      
-      for (final entry in _predefinedResponses.entries) {
-        if (lowerMessage.contains(entry.key)) {
-          return entry.value;
+      // Get current user info
+      final currentUser = _authService.getCurrentUser();
+      if (currentUser == null) {
+        return 'Please sign in to use the AI assistant.';
+      }
+
+      // Check if N8N service is configured
+      if (_n8nService.isConfigured) {
+        // Get user type for context
+        String userType = AppConstants.userTypeTenant; // default
+        try {
+          final databaseService = DatabaseService();
+          final userModel = await databaseService.getUser(currentUser.uid);
+          userType = userModel?.userType ?? AppConstants.userTypeTenant;
+        } catch (e) {
+          // Use default if user type retrieval fails
         }
-      }
-
-      // If no predefined response, try AI API (if configured)
-      // For now, return a helpful default message
-      return _getDefaultResponse(userMessage);
-      
-      // Uncomment below to use OpenAI API when you have an API key
-      /*
-      final response = await http.post(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_apiKey',
-        },
-        body: jsonEncode({
-          'model': 'gpt-3.5-turbo',
-          'messages': [
-            {
-              'role': 'system',
-              'content': 'You are a helpful assistant for a house rental mobile app called RentHouse. Help users with property searches, listings, and rental-related questions. Keep responses concise and friendly.'
-            },
-            {
-              'role': 'user',
-              'content': userMessage
-            }
-          ],
-          'max_tokens': 200,
-          'temperature': 0.7,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['choices'][0]['message']['content'] as String;
+        
+        // Use N8N AI service
+        final response = await _n8nService.sendMessage(
+          message: userMessage,
+          userId: currentUser.uid,
+          userType: userType,
+        );
+        return response;
       } else {
-        return _getDefaultResponse(userMessage);
+        // Fallback to basic responses
+        return _getFallbackResponse(userMessage);
       }
-      */
     } catch (e) {
-      return 'Sorry, I encountered an error. Please try again or contact support.';
+      // Return fallback response if N8N fails
+      return _getFallbackResponse(userMessage);
     }
   }
 
-  String _getDefaultResponse(String message) {
+  String _getFallbackResponse(String message) {
+    final lowerMessage = message.toLowerCase();
+    
+    // Check for basic fallback responses
+    for (final entry in _fallbackResponses.entries) {
+      if (lowerMessage.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+
+    // Default fallback responses
     final responses = [
-      'That\'s a great question! For specific inquiries, you can contact our support team or browse the help section in the app.',
-      'I\'m here to help! Could you please rephrase that? I can assist with property searches, listings, and general rental questions.',
-      'Thanks for your message! I specialize in helping with RentHouse app features. Try asking about searching, adding properties, or contacting landlords.',
-      'I appreciate your question! For detailed assistance, please check the app\'s help section or contact customer support.',
+      'I\'m here to help! For specific assistance, please check the app\'s help section or contact customer support.',
+      'Thanks for your message! I can assist with basic RentHouse app features. Try asking about searching properties or managing listings.',
+      'I appreciate your question! For detailed assistance, please explore the app or contact our support team.',
     ];
     
     return responses[DateTime.now().millisecondsSinceEpoch % responses.length];
   }
 
-  // Get suggested questions
-  List<String> getSuggestedQuestions() {
-    return [
-      'How do I search for properties?',
-      'How to add a property listing?',
-      'How to contact a landlord?',
-      'What are the safety tips?',
-      'How to save favorites?',
-      'Tell me about lease agreements',
-    ];
+  // Get role-based suggested questions
+  Future<List<String>> getSuggestedQuestions() async {
+    final currentUser = _authService.getCurrentUser();
+    if (currentUser == null) {
+      return [
+        'How do I use the RentHouse app?',
+        'What are the safety tips for renting?',
+        'How to create a good listing?',
+      ];
+    }
+
+    // Try to get user type from database
+    try {
+      // Import DatabaseService here to avoid circular dependency
+      final databaseService = DatabaseService();
+      final userModel = await databaseService.getUser(currentUser.uid);
+      final userType = userModel?.userType ?? AppConstants.userTypeTenant;
+      
+      return _n8nService.getSuggestedQuestions(userType);
+    } catch (e) {
+      // Fallback to tenant suggestions
+      return _n8nService.getSuggestedQuestions(AppConstants.userTypeTenant);
+    }
+  }
+
+  // Get configuration status
+  Map<String, dynamic> getConfigurationStatus() {
+    return _n8nService.getConfigurationStatus();
   }
 }

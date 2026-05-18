@@ -3,6 +3,7 @@ import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/screens/auth/login_screen.dart';
 import 'package:renthouse/screens/dashboard_screen.dart';
 import 'package:renthouse/services/auth_service.dart';
+import 'package:renthouse/services/notification_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -20,6 +21,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _confirmPasswordController = TextEditingController();
   String _selectedUserType = AppConstants.userTypeTenant;
   final AuthService _authService = AuthService();
+  final NotificationService _notificationService = NotificationService();
   bool _isLoading = false;
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
@@ -57,6 +59,13 @@ class _SignupScreenState extends State<SignupScreen> {
         );
 
         if (user != null) {
+          // Initialize FCM and save token
+          final fcmToken = await _notificationService.initializeFCM();
+          if (fcmToken != null) {
+            await _notificationService.saveFCMToken(user.uid, fcmToken);
+            _notificationService.onTokenRefresh(user.uid);
+          }
+          
           if (!mounted) return;
           Navigator.pushReplacement(
             context,
@@ -329,22 +338,18 @@ class _SignupScreenState extends State<SignupScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                Row(
+                                Column(
                                   children: [
-                                    Expanded(
-                                      child: _buildUserTypeOption(
-                                        'Tenant',
-                                        Icons.person,
-                                        AppConstants.userTypeTenant,
-                                      ),
+                                    _buildUserTypeOption(
+                                      'I am looking for a home',
+                                      Icons.person,
+                                      AppConstants.userTypeTenant,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: _buildUserTypeOption(
-                                        'Landlord',
-                                        Icons.home,
-                                        AppConstants.userTypeLandlord,
-                                      ),
+                                    const SizedBox(height: 12),
+                                    _buildUserTypeOption(
+                                      'I want to rent out property',
+                                      Icons.home,
+                                      AppConstants.userTypeLandlord,
                                     ),
                                   ],
                                 ),

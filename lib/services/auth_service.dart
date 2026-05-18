@@ -22,13 +22,11 @@ class AuthService {
         email: email,
         password: password,
       );
-      
-      // Initialize FCM and save token
+
       if (result.user != null) {
         final fcmToken = await _notificationService.initializeFCM();
-        if (fcmToken != null) {
-          await _notificationService.saveFCMToken(result.user!.uid, fcmToken);
-        }
+        await _notificationService.saveFCMToken(result.user!.uid, fcmToken);
+        _notificationService.onTokenRefresh(result.user!.uid);
       }
       
       return result.user;
@@ -133,6 +131,12 @@ class AuthService {
               .doc(user.uid)
               .set(userModel.toMap());
         }
+      }
+
+      if (user != null) {
+        final fcmToken = await _notificationService.initializeFCM();
+        await _notificationService.saveFCMToken(user.uid, fcmToken);
+        _notificationService.onTokenRefresh(user.uid);
       }
 
       return user;

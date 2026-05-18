@@ -7,6 +7,7 @@ class UserModel {
   final String phone;
   final String userType;
   final String? profileImage;
+  final String? fcmToken;
   final DateTime createdAt;
 
   UserModel({
@@ -16,6 +17,7 @@ class UserModel {
     required this.phone,
     required this.userType,
     this.profileImage,
+    this.fcmToken,
     required this.createdAt,
   });
 
@@ -27,6 +29,7 @@ class UserModel {
       'phone': phone,
       'userType': userType,
       'profileImage': profileImage,
+      'fcmToken': fcmToken,
       'createdAt': createdAt,
     };
   }
@@ -39,6 +42,7 @@ class UserModel {
       phone: map['phone'] ?? '',
       userType: map['userType'] ?? '',
       profileImage: map['profileImage'],
+      fcmToken: map['fcmToken'],
       createdAt: (map['createdAt'] as Timestamp).toDate(),
     );
   }

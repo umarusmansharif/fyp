@@ -130,56 +130,43 @@ class _HouseDetailScreenState extends State<HouseDetailScreen> {
     if (widget.currentUser == null) return;
 
     try {
-      // Create order
-      final orderId = const Uuid().v4();
-      final order = OrderModel(
-        orderId: orderId,
-        houseId: widget.house.houseId,
+      final hasExistingRequest = await _databaseService.hasPendingVisitRequest(
+        widget.currentUser!.uid,
+        widget.house.houseId,
+      );
+
+      if (hasExistingRequest) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You have already sent a request for this property.'),
+            backgroundColor: Color(0xFFF59E0B),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      final requestId = await _databaseService.createVisitRequest(
         tenantId: widget.currentUser!.uid,
+        ownerId: widget.house.landlordId,
+        listingId: widget.house.houseId,
+        tenantName: widget.currentUser!.name,
+        listingTitle: widget.house.title,
+      );
+
+      await _notificationService.sendPropertyRequestNotification(
         landlordId: widget.house.landlordId,
-        status: AppConstants.orderStatusPending,
-        createdAt: DateTime.now(),
+        propertyId: widget.house.houseId,
+        propertyTitle: widget.house.title,
+        tenantName: widget.currentUser!.name,
+        requestId: requestId,
       );
-
-      await _databaseService.createOrder(order);
-
-      // Send push notification to landlord
-      await _notificationService.sendNotification(
-        recipientId: widget.house.landlordId,
-        title: 'New Request',
-        body: 'Someone requested to visit your property',
-        data: {
-          'type': 'property_request',
-          'orderId': orderId,
-          'houseId': widget.house.houseId,
-        },
-      );
-
-      // Create notification for landlord (existing logic)
-      final notificationId = const Uuid().v4();
-      final notification = NotificationModel(
-        id: notificationId,
-        landlordId: widget.house.landlordId,
-        tenantId: widget.currentUser!.uid,
-        houseId: widget.house.houseId,
-        message: '${widget.currentUser!.name} is interested in your property',
-        createdAt: DateTime.now(),
-      );
-
-      await _databaseService.createNotification(notification);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Request sent successfully!'),
-        ),
-      );
-
-      // Navigate to order detail screen
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => OrderDetailScreen(order: order),
         ),
       );
     } catch (e) {

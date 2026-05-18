@@ -3,6 +3,7 @@ import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/screens/auth/signup_screen.dart';
 import 'package:renthouse/screens/dashboard_screen.dart';
 import 'package:renthouse/services/auth_service.dart';
+import 'package:renthouse/services/notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -16,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
+  final NotificationService _notificationService = NotificationService();
   bool _isLoading = false;
   bool _isPasswordVisible = false;
 
@@ -46,6 +48,13 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (user != null) {
+          // Initialize FCM and save token
+          final fcmToken = await _notificationService.initializeFCM();
+          if (fcmToken != null) {
+            await _notificationService.saveFCMToken(user.uid, fcmToken);
+            _notificationService.onTokenRefresh(user.uid);
+          }
+          
           if (!mounted) return;
           Navigator.pushReplacement(
             context,

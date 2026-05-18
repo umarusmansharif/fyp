@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/models/house_model.dart';
@@ -9,10 +10,12 @@ import 'package:renthouse/screens/auth/login_screen.dart';
 import 'package:renthouse/screens/chat_list_screen.dart';
 import 'package:renthouse/screens/favorites_screen.dart';
 import 'package:renthouse/screens/house_detail_screen.dart';
+import 'package:renthouse/screens/notification_screen.dart';
 import 'package:renthouse/screens/profile_screen.dart';
 import 'package:renthouse/screens/search_screen.dart';
 import 'package:renthouse/services/auth_service.dart';
 import 'package:renthouse/services/database_service.dart';
+import 'package:renthouse/services/notification_service.dart';
 import 'package:renthouse/widgets/house_card.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -25,12 +28,14 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
+  final NotificationService _notificationService = NotificationService();
   UserModel? _currentUser;
   int _currentIndex = 0;
   int _selectedCategory = 0;
   Position? _userPosition;
   bool _isLoadingLocation = false;
   int _totalUnreadCount = 0;
+  int _notificationCount = 0;
 
   @override
   void initState() {
@@ -38,6 +43,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     WidgetsBinding.instance.addObserver(this);
     _loadUserData();
     _listenToUnreadCount();
+    _listenToNotificationCount();
+    _setupNotificationHandler();
   }
 
   @override
@@ -75,6 +82,54 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
           });
         }
       });
+    }
+  }
+
+  void _listenToNotificationCount() {
+    final user = _authService.getCurrentUser();
+    if (user != null) {
+      _notificationService.getUnreadNotificationCount(user.uid).listen((count) {
+        if (mounted) {
+          setState(() {
+            _notificationCount = count;
+          });
+        }
+      });
+    }
+  }
+
+  void _setupNotificationHandler() {
+    final user = _authService.getCurrentUser();
+    if (user != null) {
+      _notificationService.onNotificationTap = (data) {
+        if (data == null) return;
+        
+        final type = data['type'];
+        if (type == 'property_request' || type == 'request_response') {
+          // Navigate to property detail or order detail
+          final propertyId = data['propertyId'];
+          if (propertyId != null && _currentUser != null) {
+            // Navigate to property detail screen
+            // Note: This would require fetching the house and navigating
+            // For simplicity, navigate to dashboard
+            if (kDebugMode) {
+              print('Navigate to property: $propertyId');
+            }
+          }
+        } else if (type == 'chat_message') {
+          // Navigate to chat detail
+          final chatId = data['chatId'];
+          if (chatId != null) {
+            // Navigate to chat detail screen
+            // Note: This would require fetching the chat and other user
+            // For simplicity, navigate to chat list
+            setState(() {
+              _currentIndex = 3; // Chat tab index
+            });
+          }
+        }
+      };
+      _notificationService.setupNotificationTapHandler();
     }
   }
   
@@ -271,8 +326,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                   );
                 },
                 child: Container(
-                  height: 54,
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  constraints: const BoxConstraints(minHeight: 54),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -289,9 +344,13 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                     children: [
                       Icon(Icons.search, color: Colors.grey[600], size: 22),
                       const SizedBox(width: 14),
-                      Text(
-                        'Search houses by location, price...',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 15),
+                      Expanded(
+                        child: Text(
+                          'Search houses by location, price...',
+                          style: TextStyle(color: Colors.grey[500], fontSize: 15),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
                     ],
                   ),
@@ -590,40 +649,21 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }
 
   Widget _buildFloatingActionButton() {
-    // Show different FAB based on user role
-    if (_currentUser?.userType == AppConstants.userTypeLandlord) {
-      // Landlord: Show Add Listing button
-      return FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => AddHouseScreen()),
-          );
-        },
-        backgroundColor: Color(0xFF1A237E),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Add Listing',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      );
-    } else {
-      // Tenant: Show AI Assistant button
-      return FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AIChatbotScreen()),
-          );
-        },
-        backgroundColor: Color(0xFF1A237E),
-        icon: const Icon(Icons.smart_toy, color: Colors.white),
-        label: const Text(
-          'AI Assistant',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      );
-    }
+    // Show AI Assistant for both tenant and landlord
+    return FloatingActionButton.extended(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AIChatbotScreen()),
+        );
+      },
+      backgroundColor: Color(0xFF1A237E),
+      icon: const Icon(Icons.smart_toy, color: Colors.white),
+      label: const Text(
+        'AI Assistant',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+    );
   }
 
   Widget _buildCategoryTab(String title, int index) {
@@ -697,12 +737,16 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
             });
             break;
           case 2: // Notifications
-            // TODO: Navigate to notifications screen when created
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Notifications coming soon!')),
-            );
-            setState(() {
-              _currentIndex = 0;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const NotificationScreen(),
+              ),
+            ).then((_) {
+              setState(() {
+                _currentIndex = 0;
+                _notificationCount = 0; // Reset count after viewing
+              });
             });
             break;
           case 3: // Chat
@@ -740,8 +784,37 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
           icon: Icon(Icons.search),
           label: 'Search',
         ),
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.notifications),
+        BottomNavigationBarItem(
+          icon: Stack(
+            children: [
+              const Icon(Icons.notifications),
+              if (_notificationCount > 0)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      _notificationCount > 99 ? '99+' : _notificationCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           label: 'Notifications',
         ),
         BottomNavigationBarItem(

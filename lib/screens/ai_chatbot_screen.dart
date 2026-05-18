@@ -16,15 +16,44 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
   
   final List<Map<String, dynamic>> _messages = [];
   bool _isTyping = false;
+  bool _isLoadingSuggestions = true;
+  List<String> _suggestedQuestions = [];
 
   @override
   void initState() {
     super.initState();
+    _initializeChat();
+  }
+
+  Future<void> _initializeChat() async {
+    // Add welcome message
     _messages.add({
       'text': 'Hello! I am your RentHouse assistant. How can I help you today?',
       'isUser': false,
       'timestamp': DateTime.now(),
     });
+    
+    // Load suggested questions
+    try {
+      final suggestions = await _chatbotService.getSuggestedQuestions();
+      if (mounted) {
+        setState(() {
+          _suggestedQuestions = suggestions;
+          _isLoadingSuggestions = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _suggestedQuestions = [
+            'How do I use the RentHouse app?',
+            'What are the safety tips for renting?',
+            'How to create a good listing?',
+          ];
+          _isLoadingSuggestions = false;
+        });
+      }
+    }
   }
 
   @override
@@ -35,7 +64,7 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
   }
 
   Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
+    if (_messageController.text.trim().isEmpty || _isTyping) return;
 
     final userMessage = _messageController.text.trim();
     
@@ -51,18 +80,33 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
 
     _scrollToBottom();
 
-    final response = await _chatbotService.getResponse(userMessage);
-
-    setState(() {
-      _messages.add({
-        'text': response,
-        'isUser': false,
-        'timestamp': DateTime.now(),
-      });
-      _isTyping = false;
-    });
-
-    _scrollToBottom();
+    try {
+      final response = await _chatbotService.getResponse(userMessage);
+      
+      if (mounted) {
+        setState(() {
+          _messages.add({
+            'text': response,
+            'isUser': false,
+            'timestamp': DateTime.now(),
+          });
+          _isTyping = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _messages.add({
+            'text': 'Sorry, I encountered an error. Please try again.',
+            'isUser': false,
+            'timestamp': DateTime.now(),
+          });
+          _isTyping = false;
+        });
+        _scrollToBottom();
+      }
+    }
   }
 
   void _scrollToBottom() {
@@ -148,19 +192,45 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
               },
             ),
           ),
-          if (_messages.length <= 1)
+          if (_messages.length <= 1 && !_isLoadingSuggestions)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _chatbotService.getSuggestedQuestions().map((question) {
+                children: _suggestedQuestions.map((question) {
                   return ActionChip(
                     label: Text(question, style: const TextStyle(fontSize: 12)),
                     onPressed: () => _useSuggestedQuestion(question),
                     backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
                   );
                 }).toList(),
+              ),
+            ),
+          if (_isLoadingSuggestions)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).primaryColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Loading suggestions...',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
           Container(
