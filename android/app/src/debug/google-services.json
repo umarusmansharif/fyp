@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "202908665820",
+    "project_id": "renthouse-d5d9e",
+    "storage_bucket": "renthouse-d5d9e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:202908665820:android:285aee51eceb6193663119",
+        "android_client_info": {
+          "package_name": "com.example.renthouse"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "202908665820-df1ca5poipeqhjfg97pv03g9suh2cu0m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.renthouse",
+            "certificate_hash": "fb432bf6f5c2d424c11e794f66a4cfc18333c013"
+          }
+        },
+        {
+          "client_id": "202908665820-j2tvmstkabut285alg9nonm2ds8ucvsh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCpzrgHCK-S2dCnI8ovRbElLpDEgNI8cTs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "202908665820-j2tvmstkabut285alg9nonm2ds8ucvsh.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "202908665820-8m0jiuu0qq917b0g8mav7vbl8q7nv9kf.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.renthouse"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

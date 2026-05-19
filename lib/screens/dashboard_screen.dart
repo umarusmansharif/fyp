@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
@@ -874,49 +875,16 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     double dLon = _toRadians(lon2 - lon1);
     
     double a = 
-      _sin2(dLat / 2) +
-      _cos(lat1) * _cos(lat2) * _sin2(dLon / 2);
+      math.pow(math.sin(dLat / 2), 2) +
+      math.cos(_toRadians(lat1)) * math.cos(_toRadians(lat2)) * 
+      math.pow(math.sin(dLon / 2), 2);
     
-    double c = 2 * _atan2(_sqrt(a), _sqrt(1 - a));
+    double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     
     return earthRadius * c;
   }
   
   double _toRadians(double degrees) {
-    return degrees * (3.141592653589793 / 180.0);
-  }
-  
-  double _sin2(double x) {
-    return _sin(x) * _sin(x);
-  }
-  
-  double _sin(double x) {
-    return x - (x * x * x) / 6 + (x * x * x * x * x) / 120;
-  }
-  
-  double _cos(double x) {
-    return 1 - (x * x) / 2 + (x * x * x * x) / 24;
-  }
-  
-  double _sqrt(double x) {
-    if (x == 0) return 0;
-    double result = x;
-    for (int i = 0; i < 10; i++) {
-      result = (result + x / result) / 2;
-    }
-    return result;
-  }
-  
-  double _atan2(double y, double x) {
-    if (x > 0) return _atan(y / x);
-    if (x < 0 && y >= 0) return _atan(y / x) + 3.141592653589793;
-    if (x < 0 && y < 0) return _atan(y / x) - 3.141592653589793;
-    if (x == 0 && y > 0) return 3.141592653589793 / 2;
-    if (x == 0 && y < 0) return -3.141592653589793 / 2;
-    return 0;
-  }
-  
-  double _atan(double x) {
-    return x - (x * x * x) / 3 + (x * x * x * x * x) / 5;
+    return degrees * (math.pi / 180.0);
   }
 }
