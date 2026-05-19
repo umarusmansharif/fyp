@@ -370,10 +370,7 @@ class DatabaseService {
         .collection(AppConstants.housesCollection)
         .orderBy('createdAt', descending: true);
 
-    // Apply Firestore-level filters
-    if (maxPrice != null) {
-      queryRef = queryRef.where('price', isLessThanOrEqualTo: maxPrice);
-    }
+    // Apply Firestore-level filters (only equality filters to avoid compound query limitations)
     if (propertyType != null && propertyType.isNotEmpty) {
       queryRef = queryRef.where('houseType', isEqualTo: propertyType);
     }
@@ -389,8 +386,15 @@ class DatabaseService {
           .map((doc) => HouseModel.fromMap(doc.data() as Map<String, dynamic>))
           .toList();
 
-      // Apply client-side filters for text search and amenities
-      // These filters work together with Firestore filters
+      // Apply client-side filters for price, text search, and amenities
+      // This avoids Firestore compound query limitations with range filters
+
+      // Price filter (client-side to avoid Firestore range filter + orderBy conflict)
+      if (maxPrice != null) {
+        houses = houses.where((house) => house.price <= maxPrice).toList();
+      }
+
+      // Text search filter (location, title, description)
       if (query != null && query.trim().isNotEmpty) {
         final searchText = query.trim().toLowerCase();
         houses = houses.where((house) {
@@ -401,6 +405,7 @@ class DatabaseService {
         }).toList();
       }
 
+      // Amenities filter
       if (amenities != null && amenities.isNotEmpty) {
         houses = houses.where((house) {
           final houseAmenities = house.amenities ?? [];

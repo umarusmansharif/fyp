@@ -241,6 +241,12 @@ class _SearchScreenState extends State<SearchScreen> {
                                     TextFormField(
                                       controller: _maxPriceController,
                                       keyboardType: TextInputType.number,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _maxPrice = double.tryParse(value.trim());
+                                          _hasSearched = true;
+                                        });
+                                      },
                                       decoration: const InputDecoration(
                                         prefixText: '₨ ',
                                         border: OutlineInputBorder(),
