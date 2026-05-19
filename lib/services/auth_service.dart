@@ -44,6 +44,12 @@ class AuthService {
     String userType,
   ) async {
     try {
+      // Check if email already exists before creating account
+      final emailExists = await checkEmailExists(email);
+      if (emailExists) {
+        throw Exception('An account already exists with this email.');
+      }
+
       UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -82,6 +88,17 @@ class AuthService {
   // Check if user is authenticated
   bool isSignedIn() {
     return _auth.currentUser != null;
+  }
+
+  // Check if email already exists in Firebase Auth
+  Future<bool> checkEmailExists(String email) async {
+    try {
+      final signInMethods = await _auth.fetchSignInMethodsForEmail(email);
+      return signInMethods.isNotEmpty;
+    } catch (e) {
+      // If there's an error checking, assume email doesn't exist to allow registration attempt
+      return false;
+    }
   }
 
   // Google Sign-In

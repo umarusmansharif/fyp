@@ -355,7 +355,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.error_outline, size: 60, color: Colors.red[400]),
+                              Icon(Icons.error_outline, size: 10, color: Colors.red[400]),
                               const SizedBox(height: 16),
                               const Text(
                                 'Index Required',
@@ -412,13 +412,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
                 const SizedBox(height: 30),
-                const Text(
-                  'Received Requests',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
                 const SizedBox(height: 15),
                 StreamBuilder<List<OrderModel>>(
                   stream: _databaseService.getOrdersForLandlord(_currentUser!.uid),
@@ -461,15 +454,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       } else {
                         return Center(child: Text('Error: ${snapshot.error}'));
                       }
-                    }
-
-                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          'You have no requests yet',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      );
                     }
 
                     final orders = snapshot.data!;
