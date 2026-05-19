@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/models/house_model.dart';
 import 'package:renthouse/models/review_model.dart';
 import 'package:renthouse/models/user_model.dart';
@@ -126,224 +127,239 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
       ),
-      body: Column(
-        children: [
-          // Rating Summary
-          FutureBuilder<double>(
-            future: _databaseService.getPropertyAverageRating(widget.house.houseId),
-            builder: (context, snapshot) {
-              final averageRating = snapshot.data ?? 0.0;
-              
-              return Container(
-                padding: const EdgeInsets.all(20),
-                margin: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(context).primaryColor,
-                      Theme.of(context).primaryColor.withOpacity(0.7),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            averageRating.toStringAsFixed(1),
-                            style: const TextStyle(
-                              fontSize: 48,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          Row(
-                            children: List.generate(5, (index) {
-                              return Icon(
-                                index < averageRating.round()
-                                    ? Icons.star
-                                    : Icons.star_border,
-                                color: Colors.white,
-                                size: 24,
-                              );
-                            }),
-                          ),
-                          const SizedBox(height: 8),
-                          StreamBuilder<int>(
-                            stream: _databaseService.getReviewCount(widget.house.houseId),
-                            builder: (context, countSnapshot) {
-                              final reviewCount = countSnapshot.data ?? 0;
-                              return Text(
-                                '$reviewCount review${reviewCount != 1 ? 's' : ''}',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                ),
-                              );
-                            },
-                          ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // Rating Summary
+              FutureBuilder<double>(
+                future: _databaseService.getPropertyAverageRating(widget.house.houseId),
+                builder: (context, snapshot) {
+                  final averageRating = snapshot.data ?? 0.0;
+                  
+                  return Container(
+                    padding: const EdgeInsets.all(20),
+                    margin: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).primaryColor,
+                          Theme.of(context).primaryColor.withOpacity(0.7),
                         ],
                       ),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    const Icon(
-                      Icons.reviews,
-                      size: 64,
-                      color: Colors.white24,
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-
-          // Write Review Section
-          if (widget.currentUser != null)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[200]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Write a Review',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Star Rating
-                  Row(
-                    children: List.generate(5, (index) {
-                      return IconButton(
-                        icon: Icon(
-                          index < _rating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 32,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _rating = index + 1.0;
-                          });
-                        },
-                      );
-                    }),
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  
-                  // Review Text
-                  TextField(
-                    controller: _reviewController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: 'Share your experience...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.all(12),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 12),
-                  
-                  // Submit Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _isSubmitting ? null : _submitReview,
-                      icon: _isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Icon(Icons.send),
-                      label: Text(_isSubmitting ? 'Submitting...' : 'Submit Review'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          const SizedBox(height: 16),
-
-          // Reviews List
-          Expanded(
-            child: StreamBuilder<List<ReviewModel>>(
-              stream: _databaseService.getPropertyReviews(widget.house.houseId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Error: ${snapshot.error}'),
-                  );
-                }
-
-                final reviews = snapshot.data ?? [];
-
-                if (reviews.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Row(
                       children: [
-                        Icon(
-                          Icons.rate_review_outlined,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                averageRating.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  fontSize: 48,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Row(
+                                children: List.generate(5, (index) {
+                                  return Icon(
+                                    index < averageRating.round()
+                                        ? Icons.star
+                                        : Icons.star_border,
+                                    color: Colors.white,
+                                    size: 24,
+                                  );
+                                }),
+                              ),
+                              const SizedBox(height: 8),
+                              StreamBuilder<int>(
+                                stream: _databaseService.getReviewCount(widget.house.houseId),
+                                builder: (context, countSnapshot) {
+                                  final reviewCount = countSnapshot.data ?? 0;
+                                  return Text(
+                                    '$reviewCount review${reviewCount != 1 ? 's' : ''}',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.reviews,
                           size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No reviews yet',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Be the first to review this property!',
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                          ),
+                          color: Colors.white24,
                         ),
                       ],
                     ),
                   );
-                }
+                },
+              ),
 
-                return ListView.separated(
+              // Write Review Section - Only for tenants
+              if (widget.currentUser != null && widget.currentUser?.userType == AppConstants.userTypeTenant)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
                   padding: const EdgeInsets.all(16),
-                  itemCount: reviews.length,
-                  separatorBuilder: (context, index) => const Divider(),
-                  itemBuilder: (context, index) {
-                    final review = reviews[index];
-                    return _buildReviewCard(review);
-                  },
-                );
-              },
-            ),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Write a Review',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Star Rating
+                      Row(
+                        children: List.generate(5, (index) {
+                          return IconButton(
+                            icon: Icon(
+                              index < _rating ? Icons.star : Icons.star_border,
+                              color: Colors.amber,
+                              size: 32,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _rating = index + 1.0;
+                              });
+                            },
+                          );
+                        }),
+                      ),
+                      
+                      const SizedBox(height: 8),
+                      
+                      // Review Text
+                      TextField(
+                        controller: _reviewController,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          hintText: 'Share your experience...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 12),
+                      
+                      // Submit Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSubmitting ? null : _submitReview,
+                          icon: _isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Icon(Icons.send),
+                          label: Text(_isSubmitting ? 'Submitting...' : 'Submit Review'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 16),
+
+              // Reviews List
+              StreamBuilder<List<ReviewModel>>(
+                stream: _databaseService.getPropertyReviews(widget.house.houseId),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const SizedBox(
+                      height: 200,
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return SizedBox(
+                      height: 200,
+                      child: Center(
+                        child: Text('Error: ${snapshot.error}'),
+                      ),
+                    );
+                  }
+
+                  final reviews = snapshot.data ?? [];
+
+                  if (reviews.isEmpty) {
+                    return SizedBox(
+                      height: 200,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.rate_review_outlined,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No reviews yet',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Be the first to review this property!',
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    itemCount: reviews.length,
+                    separatorBuilder: (context, index) => const Divider(),
+                    itemBuilder: (context, index) {
+                      final review = reviews[index];
+                      return _buildReviewCard(review);
+                    },
+                  );
+                },
+              ),
+              
+              const SizedBox(height: 16),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

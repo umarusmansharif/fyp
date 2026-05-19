@@ -998,10 +998,28 @@ class DatabaseService {
   // Add review
   Future<void> addReview(ReviewModel review) async {
     try {
+      // Generate reviewId if empty
+      String reviewId = review.reviewId;
+      if (reviewId.isEmpty) {
+        reviewId = const Uuid().v4();
+      }
+      
+      // Create a new review with the generated ID
+      final reviewWithId = ReviewModel(
+        reviewId: reviewId,
+        propertyId: review.propertyId,
+        userId: review.userId,
+        userName: review.userName,
+        userAvatar: review.userAvatar,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt,
+      );
+      
       await _firestore
           .collection(AppConstants.reviewsCollection)
-          .doc(review.reviewId)
-          .set(review.toMap());
+          .doc(reviewId)
+          .set(reviewWithId.toMap());
     } catch (e) {
       rethrow;
     }
