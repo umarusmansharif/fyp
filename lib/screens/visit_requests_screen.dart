@@ -42,13 +42,13 @@ class _VisitRequestsScreenState extends State<VisitRequestsScreen> {
   Future<void> _updateRequestStatus(String requestId, String status, String tenantId, String propertyTitle) async {
     try {
       await _databaseService.updateVisitRequestStatus(requestId, status);
-      
+
       // Send notification to tenant about the response
       if (status == AppConstants.orderStatusAccepted) {
         await _notificationService.sendRequestResponseNotification(
           tenantId: tenantId,
           isAccepted: true,
-          propertyId: requestId, // Using requestId as propertyId since we don't have the actual propertyId
+          propertyId: requestId,
           propertyTitle: propertyTitle,
         );
       } else if (status == AppConstants.orderStatusRejected) {
@@ -59,13 +59,13 @@ class _VisitRequestsScreenState extends State<VisitRequestsScreen> {
           propertyTitle: propertyTitle,
         );
       }
-      
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Request ${status.toLowerCase()}'),
-          backgroundColor: status == AppConstants.orderStatusAccepted 
-              ? Colors.green 
+          backgroundColor: status == AppConstants.orderStatusAccepted
+              ? Colors.green
               : Colors.red,
         ),
       );
