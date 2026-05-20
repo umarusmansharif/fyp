@@ -11,6 +11,7 @@ import 'package:renthouse/screens/auth/login_screen.dart';
 import 'package:renthouse/screens/chat_list_screen.dart';
 import 'package:renthouse/screens/favorites_screen.dart';
 import 'package:renthouse/screens/house_detail_screen.dart';
+import 'package:renthouse/screens/more_screen.dart';
 import 'package:renthouse/screens/notification_screen.dart';
 import 'package:renthouse/screens/profile_screen.dart';
 import 'package:renthouse/screens/search_screen.dart';
@@ -725,19 +726,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         switch (index) {
           case 0: // Home - stay on dashboard
             break;
-          case 1: // Search
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SearchScreen(currentUser: _currentUser),
-              ),
-            ).then((_) {
-              setState(() {
-                _currentIndex = 0;
-              });
-            });
-            break;
-          case 2: // Notifications
+          case 1: // Notifications
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -750,7 +739,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
               });
             });
             break;
-          case 3: // Chat
+          case 2: // Chat
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -762,11 +751,23 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
               });
             });
             break;
-          case 4: // Favorites
+          case 3: // Favorites
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => FavoritesScreen(currentUser: _currentUser),
+              ),
+            ).then((_) {
+              setState(() {
+                _currentIndex = 0;
+              });
+            });
+            break;
+          case 4: // More
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const MoreScreen(),
               ),
             ).then((_) {
               setState(() {
@@ -780,10 +781,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         const BottomNavigationBarItem(
           icon: Icon(Icons.home),
           label: 'Home',
-        ),
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.search),
-          label: 'Search',
         ),
         BottomNavigationBarItem(
           icon: Stack(
@@ -854,6 +851,10 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         const BottomNavigationBarItem(
           icon: Icon(Icons.favorite),
           label: 'Favorite',
+        ),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.menu),
+          label: 'More',
         ),
       ],
     );
