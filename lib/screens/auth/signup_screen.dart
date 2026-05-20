@@ -75,7 +75,10 @@ class _SignupScreenState extends State<SignupScreen> {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(
+            content: Text(_authService.getAuthErrorMessage(e)),
+            backgroundColor: Colors.red,
+          ),
         );
       } finally {
         setState(() {
@@ -645,7 +648,7 @@ class _SignupScreenState extends State<SignupScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text(_authService.getAuthErrorMessage(e)),
           backgroundColor: Colors.red,
         ),
       );

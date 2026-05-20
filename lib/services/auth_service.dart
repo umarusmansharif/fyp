@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
 import 'package:renthouse/models/user_model.dart';
 import 'package:renthouse/core/constants.dart';
 import 'package:renthouse/services/notification_service.dart';
@@ -169,5 +170,44 @@ class AuthService {
     } catch (e) {
       rethrow;
     }
+  }
+
+  // Get user-friendly error message from Firebase exception
+  String getAuthErrorMessage(dynamic error) {
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'user-not-found':
+          return 'No account found with this email.';
+        case 'wrong-password':
+          return 'Incorrect password. Please try again.';
+        case 'email-already-in-use':
+          return 'An account already exists with this email.';
+        case 'invalid-email':
+          return 'Please enter a valid email address.';
+        case 'weak-password':
+          return 'Password is too weak. Please use a stronger password.';
+        case 'user-disabled':
+          return 'This account has been disabled.';
+        case 'too-many-requests':
+          return 'Too many attempts. Please try again later.';
+        case 'operation-not-allowed':
+          return 'This operation is not allowed.';
+        case 'account-exists-with-different-credential':
+          return 'An account already exists with different credentials.';
+        case 'invalid-credential':
+          return 'Invalid credentials. Please try again.';
+        case 'network-request-failed':
+          return 'Network error. Please check your internet connection.';
+        default:
+          return 'Something went wrong. Please try again later.';
+      }
+    } else if (error is Exception) {
+      final message = error.toString();
+      if (message.contains('An account already exists with this email')) {
+        return 'An account already exists with this email.';
+      }
+      return 'Something went wrong. Please try again later.';
+    }
+    return 'Something went wrong. Please try again later.';
   }
 }

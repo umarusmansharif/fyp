@@ -64,7 +64,10 @@ class _LoginScreenState extends State<LoginScreen> {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(
+            content: Text(_authService.getAuthErrorMessage(e)),
+            backgroundColor: Colors.red,
+          ),
         );
       } finally {
         setState(() {
@@ -556,7 +559,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
       
-      // Show generic message for all errors
+      // Show generic message for all errors (security best practice)
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('If this email is registered, a reset link has been sent'),
@@ -590,7 +593,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text(_authService.getAuthErrorMessage(e)),
           backgroundColor: Colors.red,
         ),
       );
