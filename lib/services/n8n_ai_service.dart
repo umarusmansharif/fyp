@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import 'package:renthouse/core/constants.dart';
 
@@ -7,42 +9,53 @@ class N8NAIService {
   static const Duration _defaultTimeout = Duration(seconds: 30);
   static const Duration _retryDelay = Duration(seconds: 2);
   static const int _maxRetries = 3;
-  
-  // N8N Configuration - Replace with your actual N8N webhook URL
-  static const String _n8nWebhookUrl = 'YOUR_N8N_WEBHOOK_URL';
-  
-  // Request tracking to prevent duplicates
-  static final Set<String> _pendingRequests = <String>{};
-  static DateTime? _lastRequestTime;
-  static const Duration _minRequestInterval = Duration(milliseconds: 500);
 
-  /// Send message to N8N AI Agent and get response
+  // N8N Production Webhook URL
+  static const String _n8nWebhookUrl =
+      'https://zair786.app.n8n.cloud/webhook/makandost_cutomer_support';
+
+  // Prevent duplicate requests
+  static final Set<String> _pendingRequests = <String>{};
+
+  static DateTime? _lastRequestTime;
+
+  static const Duration _minRequestInterval =
+  Duration(milliseconds: 500);
+
+  /// Send message to N8N AI Agent
   Future<String> sendMessage({
     required String message,
     required String userId,
     required String userType,
     Map<String, dynamic>? context,
   }) async {
-    // Validate inputs
+    // Validate message
     if (message.trim().isEmpty) {
       return 'Please enter a message.';
     }
 
-    // Prevent duplicate requests
-    final requestKey = '${userId}_${message.hashCode}';
+    final requestKey =
+        '${userId}_${message.trim().hashCode}';
+
+    // Prevent duplicate request
     if (_pendingRequests.contains(requestKey)) {
       return 'Please wait for the previous response...';
     }
 
-    // Rate limiting
+    // Basic rate limiting
     if (_lastRequestTime != null) {
-      final timeSinceLastRequest = DateTime.now().difference(_lastRequestTime!);
-      if (timeSinceLastRequest < _minRequestInterval) {
-        await Future.delayed(_minRequestInterval - timeSinceLastRequest);
+      final difference =
+      DateTime.now().difference(_lastRequestTime!);
+
+      if (difference < _minRequestInterval) {
+        await Future.delayed(
+          _minRequestInterval - difference,
+        );
       }
     }
 
     _pendingRequests.add(requestKey);
+
     _lastRequestTime = DateTime.now();
 
     try {
@@ -52,16 +65,18 @@ class N8NAIService {
         userType: userType,
         context: context,
       );
-      
+
       return response;
     } catch (e) {
+      print('FINAL ERROR: $e');
+
       return _handleError(e);
     } finally {
       _pendingRequests.remove(requestKey);
     }
   }
 
-  /// Send HTTP request with retry logic
+  /// Send request with retry logic
   Future<String> _sendRequestWithRetry({
     required String message,
     required String userId,
@@ -72,48 +87,99 @@ class N8NAIService {
     try {
       final payload = {
         'message': message.trim(),
-        'userId': userId,
-        'userType': userType,
-        'timestamp': DateTime.now().toIso8601String(),
-        'app': 'renthouse',
-        'context': context ?? {},
       };
+
+      print('==============================');
+      print('N8N REQUEST START');
+      print('URL: $_n8nWebhookUrl');
+      print('Payload: ${jsonEncode(payload)}');
 
       final response = await http
           .post(
-            Uri.parse(_n8nWebhookUrl),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'User-Agent': 'RentHouse-App/1.0',
-            },
-            body: jsonEncode(payload),
-          )
+        Uri.parse(_n8nWebhookUrl),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      )
           .timeout(_defaultTimeout);
 
+      print('STATUS CODE: ${response.statusCode}');
+      print('RAW RESPONSE: ${response.body}');
+      print('==============================');
+
+      // Success
       if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        
-        // Handle different response formats
-        if (responseData is Map<String, dynamic>) {
-          return responseData['response'] ?? 
-                 responseData['message'] ?? 
-                 responseData['text'] ?? 
-                 'Sorry, I could not process your request.';
-        } else if (responseData is String) {
-          return responseData;
-        } else {
-          return 'Received an unexpected response format.';
+        // Empty response check
+        if (response.body.trim().isEmpty) {
+          return 'Empty response received from AI.';
         }
-      } else {
-        throw HttpException(
-          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
-          statusCode: response.statusCode,
-        );
+
+        dynamic data;
+
+        try {
+          data = jsonDecode(response.body);
+        } catch (e) {
+          print('JSON PARSE ERROR: $e');
+
+          return 'Invalid JSON response from server.';
+        }
+
+        print('DECODED RESPONSE: $data');
+
+        String? botReply;
+
+        // Case 1: Object response
+        if (data is Map<String, dynamic>) {
+          botReply =
+              data['reply']?.toString() ??
+                  data['output']?.toString() ??
+                  data['response']?.toString() ??
+                  data['text']?.toString();
+        }
+
+        // Case 2: List response
+        else if (data is List && data.isNotEmpty) {
+          final firstItem = data.first;
+
+          if (firstItem is Map<String, dynamic>) {
+            botReply =
+                firstItem['reply']?.toString() ??
+                    firstItem['output']?.toString() ??
+                    firstItem['response']?.toString() ??
+                    firstItem['text']?.toString();
+          }
+        }
+
+        // Final validation
+        if (botReply != null &&
+            botReply.trim().isNotEmpty) {
+          return botReply.trim();
+        }
+
+        return 'AI response format is invalid.';
       }
-    } on SocketException {
+
+      // HTTP Errors
+      print(
+        'HTTP ERROR => ${response.statusCode}: ${response.body}',
+      );
+
+      throw HttpException(
+        'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        uri: Uri.parse(_n8nWebhookUrl),
+      );
+    }
+
+    // Internet issue
+    on SocketException catch (e) {
+      print('SOCKET ERROR: $e');
+
       if (retryCount < _maxRetries) {
-        await Future.delayed(_retryDelay * (retryCount + 1));
+        await Future.delayed(
+          _retryDelay * (retryCount + 1),
+        );
+
         return _sendRequestWithRetry(
           message: message,
           userId: userId,
@@ -122,10 +188,19 @@ class N8NAIService {
           retryCount: retryCount + 1,
         );
       }
-      throw 'No internet connection. Please check your network and try again.';
-    } on TimeoutException {
+
+      return 'No internet connection. Please check your network.';
+    }
+
+    // Timeout
+    on TimeoutException catch (e) {
+      print('TIMEOUT ERROR: $e');
+
       if (retryCount < _maxRetries) {
-        await Future.delayed(_retryDelay * (retryCount + 1));
+        await Future.delayed(
+          _retryDelay * (retryCount + 1),
+        );
+
         return _sendRequestWithRetry(
           message: message,
           userId: userId,
@@ -134,12 +209,19 @@ class N8NAIService {
           retryCount: retryCount + 1,
         );
       }
-      throw 'Request timed out. Please try again.';
-    } on HttpException {
-      rethrow;
-    } catch (e) {
+
+      return 'Request timeout. Please try again.';
+    }
+
+    // Other issues
+    catch (e) {
+      print('UNEXPECTED ERROR: $e');
+
       if (retryCount < _maxRetries) {
-        await Future.delayed(_retryDelay * (retryCount + 1));
+        await Future.delayed(
+          _retryDelay * (retryCount + 1),
+        );
+
         return _sendRequestWithRetry(
           message: message,
           userId: userId,
@@ -148,39 +230,31 @@ class N8NAIService {
           retryCount: retryCount + 1,
         );
       }
-      throw 'An unexpected error occurred: ${e.toString()}';
+
+      return 'Unexpected error: ${e.toString()}';
     }
   }
 
-  /// Handle different types of errors
+  /// Error messages
   String _handleError(dynamic error) {
+    print('HANDLE ERROR => $error');
+
     if (error is HttpException) {
-      switch (error.statusCode) {
-        case 400:
-          return 'Invalid request. Please try again.';
-        case 401:
-          return 'Authentication failed. Please contact support.';
-        case 403:
-          return 'Access denied. Please contact support.';
-        case 404:
-          return 'Service not available. Please try again later.';
-        case 429:
-          return 'Too many requests. Please wait and try again.';
-        case 500:
-          return 'Server error. Please try again later.';
-        case 503:
-          return 'Service temporarily unavailable. Please try again later.';
-        default:
-          return 'Service error (${error.statusCode}). Please try again.';
-      }
-    } else if (error is String) {
-      return error;
-    } else {
-      return 'An unexpected error occurred. Please try again.';
+      return 'Server error. Please try again later.';
     }
+
+    if (error is SocketException) {
+      return 'No internet connection.';
+    }
+
+    if (error is TimeoutException) {
+      return 'Request timeout.';
+    }
+
+    return error.toString();
   }
 
-  /// Get role-based suggested questions
+  /// Suggested questions
   List<String> getSuggestedQuestions(String userType) {
     switch (userType.toLowerCase()) {
       case AppConstants.userTypeLandlord:
@@ -192,6 +266,7 @@ class N8NAIService {
           'How to handle tenant inquiries?',
           'Tell me about property maintenance',
         ];
+
       case AppConstants.userTypeTenant:
         return [
           'How do I search for properties?',
@@ -201,6 +276,7 @@ class N8NAIService {
           'What should I check before renting?',
           'Tell me about lease agreements',
         ];
+
       default:
         return [
           'How do I use the RentHouse app?',
@@ -213,13 +289,12 @@ class N8NAIService {
     }
   }
 
-  /// Check if N8N service is configured
+  /// Configuration check
   bool get isConfigured {
-    return _n8nWebhookUrl != 'YOUR_N8N_WEBHOOK_URL' && 
-           _n8nWebhookUrl.isNotEmpty;
+    return _n8nWebhookUrl.isNotEmpty;
   }
 
-  /// Get configuration status
+  /// Status
   Map<String, dynamic> getConfigurationStatus() {
     return {
       'isConfigured': isConfigured,
@@ -229,31 +304,4 @@ class N8NAIService {
       'retryDelay': _retryDelay.inSeconds,
     };
   }
-}
-
-/// Custom exceptions for better error handling
-class HttpException implements Exception {
-  final String message;
-  final int statusCode;
-  
-  const HttpException(this.message, {required this.statusCode});
-  
-  @override
-  String toString() => message;
-}
-
-class SocketException implements Exception {
-  final String message;
-  const SocketException(this.message);
-  
-  @override
-  String toString() => message;
-}
-
-class TimeoutException implements Exception {
-  final String message;
-  const TimeoutException(this.message);
-  
-  @override
-  String toString() => message;
 }

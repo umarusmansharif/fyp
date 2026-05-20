@@ -141,18 +141,22 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
               child: const Icon(Icons.smart_toy, size: 24),
             ),
             const SizedBox(width: 12),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'RentHouse Assistant',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'Online',
-                  style: TextStyle(fontSize: 12, color: Colors.white70),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'RentHouse Assistant',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Text(
+                    'Online',
+                    style: TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

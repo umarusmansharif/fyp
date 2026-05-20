@@ -651,21 +651,35 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }
 
   Widget _buildFloatingActionButton() {
-    // Show AI Assistant for both tenant and landlord
-    return FloatingActionButton.extended(
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AIChatbotScreen()),
-        );
-      },
-      backgroundColor: Color(0xFF1A237E),
-      icon: const Icon(Icons.smart_toy, color: Colors.white),
-      label: const Text(
-        'AI Assistant',
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      ),
-    );
+    // Show Add House FAB for landlords, Customer Support for tenants
+    if (_currentUser?.userType == AppConstants.userTypeLandlord) {
+      return FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddHouseScreen()),
+          );
+        },
+        backgroundColor: Color(0xFF1A237E),
+        child: const Icon(Icons.add, color: Colors.white),
+      );
+    } else {
+      // Show Customer Support for tenants
+      return FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AIChatbotScreen()),
+          );
+        },
+        backgroundColor: Color(0xFF1A237E),
+        icon: const Icon(Icons.support_agent, color: Colors.white),
+        label: const Text(
+          'Need Help?',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
   }
 
   Widget _buildCategoryTab(String title, int index) {

@@ -63,7 +63,7 @@ dependencies:
   image_picker: ^1.1.2
   
   # HTTP for API calls
-  http: ^1.2.2
+  http: ^1.6.0
   
   # Path utilities for file handling
   path: ^1.9.0
@@ -78,6 +78,7 @@ dependencies:
   
   # Sign In Button
   sign_in_button: ^3.2.0
+  googleapis_auth: ^2.0.0
 
 dev_dependencies:
   flutter_test:
