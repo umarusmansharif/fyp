@@ -129,6 +129,7 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Row(
           children: [
@@ -250,6 +251,7 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
               ],
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
                   child: Container(
@@ -263,8 +265,10 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
                       decoration: const InputDecoration(
                         hintText: 'Ask me anything...',
                         border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 12),
                       ),
-                      maxLines: null,
+                      maxLines: 2,
+                      minLines: 1,
                       textCapitalization: TextCapitalization.sentences,
                       onSubmitted: (_) => _sendMessage(),
                     ),
